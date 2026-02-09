@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuthStore } from "@/stores/auth-store";
-import { projects } from "@/lib/api";
+import { createClient } from "@/lib/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -31,12 +31,33 @@ export default function ProjectsPage() {
 
   const { data: projectList, isLoading } = useQuery({
     queryKey: ["projects", currentOrgId],
-    queryFn: () => projects.list(currentOrgId!),
+    queryFn: async () => {
+      const supabase = createClient();
+      const { data, error } = await supabase
+        .from("projects")
+        .select("*")
+        .eq("org_id", currentOrgId!)
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return data || [];
+    },
     enabled: !!currentOrgId,
   });
 
   const createMutation = useMutation({
-    mutationFn: () => projects.create(currentOrgId!, { name, description: description || undefined }),
+    mutationFn: async () => {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not authenticated");
+      const { error } = await supabase
+        .from("projects")
+        .insert({
+          org_id: currentOrgId!,
+          name,
+          description: description || null,
+        });
+      if (error) throw new Error(error.message);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["projects", currentOrgId] });
       toast.success("Project created");

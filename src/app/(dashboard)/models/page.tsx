@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useAuthStore } from "@/stores/auth-store";
-import { models, projects } from "@/lib/api";
+import { createClient } from "@/lib/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -41,13 +41,32 @@ export default function ModelsPage() {
 
   const { data: projectList } = useQuery({
     queryKey: ["projects", currentOrgId],
-    queryFn: () => projects.list(currentOrgId!),
+    queryFn: async () => {
+      const supabase = createClient();
+      const { data, error } = await supabase
+        .from("projects")
+        .select("*")
+        .eq("org_id", currentOrgId!)
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return data || [];
+    },
     enabled: !!currentOrgId,
   });
 
   const { data: modelList, isLoading } = useQuery({
     queryKey: ["models", currentOrgId, selectedProject],
-    queryFn: () => models.list(currentOrgId!, selectedProject),
+    queryFn: async () => {
+      const supabase = createClient();
+      const { data, error } = await supabase
+        .from("models")
+        .select("*")
+        .eq("org_id", currentOrgId!)
+        .eq("project_id", selectedProject)
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return data || [];
+    },
     enabled: !!currentOrgId && !!selectedProject,
   });
 
@@ -118,7 +137,7 @@ export default function ModelsPage() {
                 <CardContent className="space-y-2">
                   {model.spend_columns && (
                     <div className="flex flex-wrap gap-1">
-                      {model.spend_columns.slice(0, 4).map((col) => (
+                      {model.spend_columns.slice(0, 4).map((col: string) => (
                         <Badge key={col} variant="secondary" className="text-xs">
                           {col.replace("spend_", "")}
                         </Badge>

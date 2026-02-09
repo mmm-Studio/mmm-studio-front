@@ -2,7 +2,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { useAuthStore } from "@/stores/auth-store";
-import { projects, jobs, models as modelsApi, datasets } from "@/lib/api";
+import { createClient } from "@/lib/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -79,13 +79,31 @@ export default function DashboardPage() {
 
   const { data: projectList, isLoading: projectsLoading } = useQuery({
     queryKey: ["projects", currentOrgId],
-    queryFn: () => projects.list(currentOrgId!),
+    queryFn: async () => {
+      const supabase = createClient();
+      const { data, error } = await supabase
+        .from("projects")
+        .select("*")
+        .eq("org_id", currentOrgId!)
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return data || [];
+    },
     enabled: !!currentOrgId,
   });
 
   const { data: jobList, isLoading: jobsLoading } = useQuery({
     queryKey: ["jobs", currentOrgId],
-    queryFn: () => jobs.list(currentOrgId!),
+    queryFn: async () => {
+      const supabase = createClient();
+      const { data, error } = await supabase
+        .from("training_jobs")
+        .select("*, models(name, status)")
+        .eq("org_id", currentOrgId!)
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return data || [];
+    },
     enabled: !!currentOrgId,
   });
 
