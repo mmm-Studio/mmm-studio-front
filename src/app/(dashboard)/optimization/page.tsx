@@ -4,7 +4,8 @@ import { useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAuthStore } from "@/stores/auth-store";
-import { models, projects, optimization, scenarios, type HistoricalOptInput, type BudgetOptInput, type PeriodCompareInput } from "@/lib/api";
+import { createClient } from "@/lib/supabase/client";
+import { optimization, scenarios, type HistoricalOptInput, type BudgetOptInput, type PeriodCompareInput } from "@/lib/api";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -70,13 +71,32 @@ export default function OptimizationPage() {
 
   const { data: projectList } = useQuery({
     queryKey: ["projects", currentOrgId],
-    queryFn: () => projects.list(currentOrgId!),
+    queryFn: async () => {
+      const supabase = createClient();
+      const { data, error } = await supabase
+        .from("projects")
+        .select("*")
+        .eq("org_id", currentOrgId!)
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return data || [];
+    },
     enabled: !!currentOrgId,
   });
 
   const { data: modelList } = useQuery({
     queryKey: ["models", currentOrgId, selectedProject],
-    queryFn: () => models.list(currentOrgId!, selectedProject),
+    queryFn: async () => {
+      const supabase = createClient();
+      const { data, error } = await supabase
+        .from("models")
+        .select("*")
+        .eq("org_id", currentOrgId!)
+        .eq("project_id", selectedProject)
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return data || [];
+    },
     enabled: !!currentOrgId && !!selectedProject,
   });
 
