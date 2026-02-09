@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuthStore } from "@/stores/auth-store";
 import { createClient } from "@/lib/supabase/client";
-import { datasets, projects } from "@/lib/api";
+import { datasets } from "@/lib/api";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -90,13 +90,32 @@ export default function DatasetsPage() {
 
   const { data: projectList } = useQuery({
     queryKey: ["projects", currentOrgId],
-    queryFn: () => projects.list(currentOrgId!),
+    queryFn: async () => {
+      const supabase = createClient();
+      const { data, error } = await supabase
+        .from("projects")
+        .select("*")
+        .eq("org_id", currentOrgId!)
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return data || [];
+    },
     enabled: !!currentOrgId,
   });
 
   const { data: datasetList, isLoading } = useQuery({
     queryKey: ["datasets", currentOrgId, viewProject],
-    queryFn: () => datasets.list(currentOrgId!, viewProject),
+    queryFn: async () => {
+      const supabase = createClient();
+      const { data, error } = await supabase
+        .from("datasets")
+        .select("*")
+        .eq("org_id", currentOrgId!)
+        .eq("project_id", viewProject)
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return data || [];
+    },
     enabled: !!currentOrgId && !!viewProject,
   });
 
@@ -129,48 +148,36 @@ export default function DatasetsPage() {
     queryKey: ["mmm-data-summary"],
     queryFn: async (): Promise<MmmDataSummary[]> => {
       const supabase = createClient();
-      const { data, error } = await supabase.rpc("get_mmm_data_summary").select();
-      if (error) {
-        // Fallback: query directly
-        const { data: rawData, error: rawError } = await supabase
+      const countries = ["ES", "FR", "IT"];
+      const summaries: MmmDataSummary[] = [];
+      for (const country of countries) {
+        const { count } = await supabase
           .from("mmm_data")
-          .select("country")
+          .select("*", { count: "exact", head: true })
+          .eq("country", country);
+        const { data: minMax } = await supabase
+          .from("mmm_data")
+          .select("date_week")
+          .eq("country", country)
+          .order("date_week", { ascending: true })
           .limit(1);
-        if (rawError) throw rawError;
-
-        // Get distinct countries and stats via separate queries
-        const countries = ["ES", "FR", "IT"];
-        const summaries: MmmDataSummary[] = [];
-        for (const country of countries) {
-          const { count } = await supabase
-            .from("mmm_data")
-            .select("*", { count: "exact", head: true })
-            .eq("country", country);
-          const { data: minMax } = await supabase
-            .from("mmm_data")
-            .select("date_week")
-            .eq("country", country)
-            .order("date_week", { ascending: true })
-            .limit(1);
-          const { data: maxDate } = await supabase
-            .from("mmm_data")
-            .select("date_week")
-            .eq("country", country)
-            .order("date_week", { ascending: false })
-            .limit(1);
-          summaries.push({
-            country,
-            rows: count || 0,
-            min_date: minMax?.[0]?.date_week || "",
-            max_date: maxDate?.[0]?.date_week || "",
-            columns: ["date_week", "country", "year", "month", "spend_Display", "spend_Social", "spend_SEM", "spend_TikTok", "black_friday", "christmas", "summer_sale", "sales"],
-            spend_columns: ["spend_Display", "spend_Social", "spend_SEM", "spend_TikTok"],
-            control_columns: ["black_friday", "christmas", "summer_sale"],
-          });
-        }
-        return summaries;
+        const { data: maxDate } = await supabase
+          .from("mmm_data")
+          .select("date_week")
+          .eq("country", country)
+          .order("date_week", { ascending: false })
+          .limit(1);
+        summaries.push({
+          country,
+          rows: count || 0,
+          min_date: minMax?.[0]?.date_week || "",
+          max_date: maxDate?.[0]?.date_week || "",
+          columns: ["date_week", "country", "year", "month", "spend_Display", "spend_Social", "spend_SEM", "spend_TikTok", "black_friday", "christmas", "summer_sale", "sales"],
+          spend_columns: ["spend_Display", "spend_Social", "spend_SEM", "spend_TikTok"],
+          control_columns: ["black_friday", "christmas", "summer_sale"],
+        });
       }
-      return data as MmmDataSummary[];
+      return summaries;
     },
   });
 
@@ -352,7 +359,7 @@ export default function DatasetsPage() {
                       </div>
                       <div className="flex items-center gap-1 text-xs text-muted-foreground">
                         <Calendar className="h-3 w-3" />
-                        {summary.min_date} — {summary.max_date}
+                        {summary.min_date} \u2014 {summary.max_date}
                       </div>
                       <div>
                         <p className="text-xs text-muted-foreground mb-1">Spend channels</p>
@@ -396,7 +403,7 @@ export default function DatasetsPage() {
                   <CardHeader>
                     <CardTitle className="text-base flex items-center gap-2">
                       <Eye className="h-4 w-4" />
-                      Data Preview — {previewCountry}
+                      Data Preview \u2014 {previewCountry}
                       <Badge variant="outline" className="ml-2 text-xs">
                         Latest 20 rows
                       </Badge>
@@ -550,7 +557,7 @@ export default function DatasetsPage() {
                       </div>
                       {ds.spend_columns && ds.spend_columns.length > 0 && (
                         <div className="flex flex-wrap gap-1">
-                          {ds.spend_columns.slice(0, 4).map((col) => (
+                          {ds.spend_columns.slice(0, 4).map((col: string) => (
                             <Badge key={col} variant="secondary" className="text-xs">
                               {col.replace("spend_", "")}
                             </Badge>
