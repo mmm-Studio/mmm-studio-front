@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuthStore } from "@/stores/auth-store";
-import { orgs, members, type Member } from "@/lib/api";
+import { createClient } from "@/lib/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -42,19 +42,42 @@ export default function SettingsPage() {
 
   const { data: orgDetail } = useQuery({
     queryKey: ["org", currentOrgId],
-    queryFn: () => orgs.get(currentOrgId!),
+    queryFn: async () => {
+      const supabase = createClient();
+      const { data, error } = await supabase
+        .from("organizations")
+        .select("*")
+        .eq("id", currentOrgId!)
+        .single();
+      if (error) throw error;
+      return data;
+    },
     enabled: !!currentOrgId,
-    initialData: undefined,
   });
 
   const { data: memberList, isLoading: membersLoading } = useQuery({
     queryKey: ["members", currentOrgId],
-    queryFn: () => members.list(currentOrgId!),
+    queryFn: async () => {
+      const supabase = createClient();
+      const { data, error } = await supabase
+        .from("memberships")
+        .select("id, user_id, role, created_at")
+        .eq("org_id", currentOrgId!);
+      if (error) throw error;
+      return data || [];
+    },
     enabled: !!currentOrgId,
   });
 
   const updateOrgMut = useMutation({
-    mutationFn: () => orgs.update(currentOrgId!, { name: orgName }),
+    mutationFn: async () => {
+      const supabase = createClient();
+      const { error } = await supabase
+        .from("organizations")
+        .update({ name: orgName })
+        .eq("id", currentOrgId!);
+      if (error) throw new Error(error.message);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["org", currentOrgId] });
       fetchUser();
@@ -64,7 +87,11 @@ export default function SettingsPage() {
   });
 
   const inviteMut = useMutation({
-    mutationFn: () => members.invite(currentOrgId!, { email: inviteEmail, role: inviteRole }),
+    mutationFn: async () => {
+      // Note: invite requires looking up user by email which needs admin privileges
+      // For now this will use the backend API when available
+      throw new Error("Invite requires backend API - coming soon");
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["members", currentOrgId] });
       toast.success(`Invited ${inviteEmail}`);
@@ -75,7 +102,15 @@ export default function SettingsPage() {
   });
 
   const removeMut = useMutation({
-    mutationFn: (userId: string) => members.remove(currentOrgId!, userId),
+    mutationFn: async (userId: string) => {
+      const supabase = createClient();
+      const { error } = await supabase
+        .from("memberships")
+        .delete()
+        .eq("org_id", currentOrgId!)
+        .eq("user_id", userId);
+      if (error) throw new Error(error.message);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["members", currentOrgId] });
       toast.success("Member removed");

@@ -3,7 +3,8 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuthStore } from "@/stores/auth-store";
-import { jobs, datasets, projects, type TrainJobInput } from "@/lib/api";
+import { createClient } from "@/lib/supabase/client";
+import { jobs, type TrainJobInput } from "@/lib/api";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -69,22 +70,50 @@ export default function JobsPage() {
 
   const { data: projectList } = useQuery({
     queryKey: ["projects", currentOrgId],
-    queryFn: () => projects.list(currentOrgId!),
+    queryFn: async () => {
+      const supabase = createClient();
+      const { data, error } = await supabase
+        .from("projects")
+        .select("*")
+        .eq("org_id", currentOrgId!)
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return data || [];
+    },
     enabled: !!currentOrgId,
   });
 
   const { data: datasetList } = useQuery({
     queryKey: ["datasets", currentOrgId, selectedProject],
-    queryFn: () => datasets.list(currentOrgId!, selectedProject),
+    queryFn: async () => {
+      const supabase = createClient();
+      const { data, error } = await supabase
+        .from("datasets")
+        .select("*")
+        .eq("org_id", currentOrgId!)
+        .eq("project_id", selectedProject)
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return data || [];
+    },
     enabled: !!currentOrgId && !!selectedProject,
   });
 
   const { data: jobList, isLoading } = useQuery({
     queryKey: ["jobs", currentOrgId],
-    queryFn: () => jobs.list(currentOrgId!),
+    queryFn: async () => {
+      const supabase = createClient();
+      const { data, error } = await supabase
+        .from("training_jobs")
+        .select("*, models(name, status)")
+        .eq("org_id", currentOrgId!)
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return data || [];
+    },
     enabled: !!currentOrgId,
     refetchInterval: (query) => {
-      const data = query.state.data;
+      const data = query.state.data as { status: string }[] | undefined;
       const hasActive = data?.some((j) => j.status === "queued" || j.status === "running");
       return hasActive ? 5000 : false;
     },
