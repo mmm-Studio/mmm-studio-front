@@ -3,7 +3,8 @@
 import { useParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { useAuthStore } from "@/stores/auth-store";
-import { models, analysis } from "@/lib/api";
+import { createClient } from "@/lib/supabase/client";
+import { analysis } from "@/lib/api";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -44,7 +45,17 @@ export default function ModelDetailPage() {
 
   const { data: model, isLoading: modelLoading } = useQuery({
     queryKey: ["model", currentOrgId, modelId],
-    queryFn: () => models.get(currentOrgId!, modelId),
+    queryFn: async () => {
+      const supabase = createClient();
+      const { data, error } = await supabase
+        .from("models")
+        .select("*, datasets(name, file_path)")
+        .eq("id", modelId)
+        .eq("org_id", currentOrgId!)
+        .single();
+      if (error) throw error;
+      return data;
+    },
     enabled: !!currentOrgId && !!modelId,
   });
 
@@ -133,7 +144,7 @@ export default function ModelDetailPage() {
       {/* Channels */}
       {model.spend_columns && (
         <div className="flex flex-wrap gap-1.5">
-          {model.spend_columns.map((col) => (
+          {model.spend_columns.map((col: string) => (
             <Badge key={col} variant="secondary">
               {col.replace("spend_", "")}
             </Badge>

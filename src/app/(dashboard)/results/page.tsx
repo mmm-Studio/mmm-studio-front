@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuthStore } from "@/stores/auth-store";
-import { models, projects, scenarios } from "@/lib/api";
+import { createClient } from "@/lib/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -41,24 +41,61 @@ export default function ResultsPage() {
 
   const { data: projectList } = useQuery({
     queryKey: ["projects", currentOrgId],
-    queryFn: () => projects.list(currentOrgId!),
+    queryFn: async () => {
+      const supabase = createClient();
+      const { data, error } = await supabase
+        .from("projects")
+        .select("*")
+        .eq("org_id", currentOrgId!)
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return data || [];
+    },
     enabled: !!currentOrgId,
   });
 
   const { data: modelList } = useQuery({
     queryKey: ["models", currentOrgId, selectedProject],
-    queryFn: () => models.list(currentOrgId!, selectedProject),
+    queryFn: async () => {
+      const supabase = createClient();
+      const { data, error } = await supabase
+        .from("models")
+        .select("*")
+        .eq("org_id", currentOrgId!)
+        .eq("project_id", selectedProject)
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return data || [];
+    },
     enabled: !!currentOrgId && !!selectedProject,
   });
 
   const { data: scenarioList, isLoading } = useQuery({
     queryKey: ["scenarios", currentOrgId, selectedModel],
-    queryFn: () => scenarios.list(currentOrgId!, selectedModel),
+    queryFn: async () => {
+      const supabase = createClient();
+      const { data, error } = await supabase
+        .from("scenarios")
+        .select("*")
+        .eq("model_id", selectedModel)
+        .eq("org_id", currentOrgId!)
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return data || [];
+    },
     enabled: !!currentOrgId && !!selectedModel,
   });
 
   const deleteMut = useMutation({
-    mutationFn: (scenarioId: string) => scenarios.delete(currentOrgId!, scenarioId),
+    mutationFn: async (scenarioId: string) => {
+      const supabase = createClient();
+      const { error } = await supabase
+        .from("scenarios")
+        .delete()
+        .eq("id", scenarioId)
+        .eq("org_id", currentOrgId!);
+      if (error) throw new Error(error.message);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["scenarios"] });
       toast.success("Scenario deleted");
