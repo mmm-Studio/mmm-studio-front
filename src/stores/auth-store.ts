@@ -1,6 +1,11 @@
 import { create } from "zustand";
 import { createClient } from "@/lib/supabase/client";
-import { auth as authApi, type AuthMe } from "@/lib/api";
+
+export interface AuthMe {
+  user_id: string;
+  email: string;
+  organizations: { id: string; name: string; slug: string; role: string }[];
+}
 
 interface AuthState {
   user: AuthMe | null;
@@ -26,7 +31,43 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   fetchUser: async () => {
     try {
       set({ isLoading: true });
-      const me = await authApi.me();
+      const supabase = createClient();
+
+      // Get authenticated user directly from Supabase
+      const {
+        data: { user: sbUser },
+        error: userError,
+      } = await supabase.auth.getUser();
+
+      if (userError || !sbUser) {
+        set({ user: null, isLoading: false, currentOrgId: null });
+        return;
+      }
+
+      // Get user's organizations via memberships table (RLS allows own rows)
+      const { data: memberships } = await supabase
+        .from("memberships")
+        .select("role, organizations(id, name, slug)")
+        .eq("user_id", sbUser.id);
+
+      const orgs = (memberships || [])
+        .filter((m: Record<string, unknown>) => m.organizations)
+        .map((m: Record<string, unknown>) => {
+          const org = m.organizations as Record<string, unknown>;
+          return {
+            id: org.id as string,
+            name: org.name as string,
+            slug: org.slug as string,
+            role: m.role as string,
+          };
+        });
+
+      const me: AuthMe = {
+        user_id: sbUser.id,
+        email: sbUser.email || "",
+        organizations: orgs,
+      };
+
       const savedOrg =
         typeof window !== "undefined"
           ? localStorage.getItem("mmm_current_org")

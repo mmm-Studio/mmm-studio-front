@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useMutation } from "@tanstack/react-query";
 import { useAuthStore } from "@/stores/auth-store";
-import { orgs } from "@/lib/api";
+import { createClient } from "@/lib/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,10 +19,26 @@ export default function NewOrgPage() {
   const [slug, setSlug] = useState("");
 
   const createMut = useMutation({
-    mutationFn: () => orgs.create({ name, slug: slug || undefined }),
-    onSuccess: async (org) => {
+    mutationFn: async () => {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not authenticated");
+
+      const finalSlug = (slug || name.toLowerCase().replace(/[^a-z0-9-]/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, ""));
+
+      const { error } = await supabase
+        .from("organizations")
+        .insert({ name, slug: finalSlug, created_by: user.id });
+
+      if (error) throw new Error(error.message);
+    },
+    onSuccess: async () => {
+      // Trigger auto-created the membership; refresh user to pick up the new org
       await fetchUser();
-      setCurrentOrg(org.id);
+      const { user: updatedUser } = useAuthStore.getState();
+      if (updatedUser?.organizations?.[0]?.id) {
+        setCurrentOrg(updatedUser.organizations[updatedUser.organizations.length - 1].id);
+      }
       toast.success("Organization created");
       router.push("/dashboard");
     },

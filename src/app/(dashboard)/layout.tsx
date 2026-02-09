@@ -1,5 +1,7 @@
 "use client";
 
+import { useEffect } from "react";
+import { useRouter, usePathname } from "next/navigation";
 import { Sidebar } from "@/components/sidebar";
 import { useAuthStore } from "@/stores/auth-store";
 import { Loader2 } from "lucide-react";
@@ -9,7 +11,15 @@ export default function DashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const { user, isLoading } = useAuthStore();
+  const { user, isLoading, currentOrgId } = useAuthStore();
+  const router = useRouter();
+  const pathname = usePathname();
+
+  useEffect(() => {
+    if (!isLoading && user && !currentOrgId && pathname !== "/orgs/new") {
+      router.replace("/orgs/new");
+    }
+  }, [isLoading, user, currentOrgId, pathname, router]);
 
   if (isLoading) {
     return (
