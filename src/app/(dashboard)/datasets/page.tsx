@@ -49,6 +49,7 @@ import {
   ChevronDown,
   ChevronUp,
   Eye,
+  ArrowDownToLine,
 } from "lucide-react";
 
 interface MmmDataSummary {
@@ -87,6 +88,8 @@ export default function DatasetsPage() {
   const [uploading, setUploading] = useState(false);
   const [activeTab, setActiveTab] = useState("preloaded");
   const [previewCountry, setPreviewCountry] = useState<string | null>(null);
+  const [importCountry, setImportCountry] = useState<string | null>(null);
+  const [importProject, setImportProject] = useState<string>("");
 
   const { data: projectList } = useQuery({
     queryKey: ["projects", currentOrgId],
@@ -198,6 +201,41 @@ export default function DatasetsPage() {
     enabled: !!previewCountry,
   });
 
+  // Import pre-loaded data as a dataset
+  const importMut = useMutation({
+    mutationFn: async ({ country, projectId }: { country: string; projectId: string }) => {
+      const supabase = createClient();
+      const summary = mmmSummary?.find((s) => s.country === country);
+      if (!summary) throw new Error("Country data not found");
+
+      const countryName = country === "ES" ? "Spain" : country === "FR" ? "France" : country === "IT" ? "Italy" : country;
+
+      const { error } = await supabase.from("datasets").insert({
+        org_id: currentOrgId!,
+        project_id: projectId,
+        name: `MMM Data - ${countryName} (${country})`,
+        file_path: `mmm_data:${country}`,
+        status: "validated",
+        row_count: summary.rows,
+        column_names: summary.columns,
+        spend_columns: summary.spend_columns,
+        control_columns: summary.control_columns,
+        date_column: "date_week",
+        target_column: "sales",
+        countries: [country],
+        date_range: { min: summary.min_date, max: summary.max_date },
+      });
+      if (error) throw new Error(error.message);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["datasets"] });
+      toast.success("Pre-loaded data imported as dataset");
+      setImportCountry(null);
+      setImportProject("");
+    },
+    onError: (err: Error) => toast.error(err.message),
+  });
+
   // Auto-select first project for viewing
   if (projectList?.length && !viewProject) {
     setViewProject(projectList[0].id);
@@ -301,7 +339,7 @@ export default function DatasetsPage() {
               </CardTitle>
               <CardDescription>
                 Marketing data already stored in the <code className="text-xs bg-muted px-1 py-0.5 rounded">mmm_data</code> table.
-                Available for training models directly.
+                Click &quot;Use for Training&quot; to import into a project.
               </CardDescription>
             </CardHeader>
           </Card>
@@ -381,7 +419,20 @@ export default function DatasetsPage() {
                           ))}
                         </div>
                       </div>
-                      <div className="flex items-center justify-end">
+                      <div className="flex items-center justify-between">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="text-xs gap-1"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setImportCountry(summary.country);
+                            if (projectList?.length) setImportProject(projectList[0].id);
+                          }}
+                        >
+                          <ArrowDownToLine className="h-3 w-3" />
+                          Use for Training
+                        </Button>
                         <Button variant="ghost" size="sm" className="text-xs gap-1">
                           <Eye className="h-3 w-3" />
                           {previewCountry === summary.country ? "Hide" : "Preview"}
@@ -396,6 +447,49 @@ export default function DatasetsPage() {
                   </Card>
                 ))}
               </div>
+
+              {/* Import to project dialog */}
+              <Dialog open={!!importCountry} onOpenChange={(v) => { if (!v) setImportCountry(null); }}>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Import Pre-loaded Data</DialogTitle>
+                    <DialogDescription>
+                      Import {importCountry === "ES" ? "Spain" : importCountry === "FR" ? "France" : importCountry === "IT" ? "Italy" : importCountry} data
+                      into a project so it can be used for model training.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label>Target Project</Label>
+                      {projectList && projectList.length > 0 ? (
+                        <Select value={importProject} onValueChange={setImportProject}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select project" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {projectList.map((p) => (
+                              <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      ) : (
+                        <p className="text-sm text-muted-foreground">
+                          No projects yet. Create a project first from the Projects page.
+                        </p>
+                      )}
+                    </div>
+                    <Button
+                      className="w-full"
+                      disabled={!importProject || !importCountry || importMut.isPending}
+                      onClick={() => importMut.mutate({ country: importCountry!, projectId: importProject })}
+                    >
+                      {importMut.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                      <ArrowDownToLine className="mr-2 h-4 w-4" />
+                      Import as Dataset
+                    </Button>
+                  </div>
+                </DialogContent>
+              </Dialog>
 
               {/* Data preview table */}
               {previewCountry && (
