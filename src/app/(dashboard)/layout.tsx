@@ -16,21 +16,23 @@ export default function DashboardLayout({
   const pathname = usePathname();
 
   useEffect(() => {
+    if (!isLoading && !user) {
+      router.replace("/login");
+    }
+  }, [isLoading, user, router]);
+
+  useEffect(() => {
     if (!isLoading && user && !currentOrgId && pathname !== "/orgs/new") {
       router.replace("/orgs/new");
     }
   }, [isLoading, user, currentOrgId, pathname, router]);
 
-  if (isLoading) {
+  if (isLoading || !user) {
     return (
       <div className="flex h-screen items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
       </div>
     );
-  }
-
-  if (!user) {
-    return null; // middleware redirects to /login
   }
 
   return (

@@ -78,7 +78,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           : me.organizations[0]?.id || null;
 
       set({ user: me, currentOrgId, isLoading: false });
-    } catch {
+    } catch (err) {
+      console.error("[auth-store] fetchUser failed:", err);
       set({ user: null, isLoading: false, currentOrgId: null });
     }
   },
