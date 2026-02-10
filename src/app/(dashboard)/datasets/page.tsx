@@ -131,8 +131,9 @@ export default function DatasetsPage() {
       const formData = new FormData();
       formData.append("file", file);
       formData.append("name", name);
+      formData.append("project_id", selectedProject);
 
-      await datasets.upload(currentOrgId, selectedProject, formData);
+      await datasets.upload(currentOrgId, formData);
       toast.success("Dataset uploaded and validated");
       queryClient.invalidateQueries({ queryKey: ["datasets"] });
       setOpen(false);
