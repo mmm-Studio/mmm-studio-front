@@ -148,29 +148,35 @@ export default function ModelDetailPage() {
 
   const isReady = model?.status === "ready";
 
-  const { data: roasData, isLoading: roasLoading } = useQuery({
+  const { data: roasData, isLoading: roasLoading, error: roasError } = useQuery({
     queryKey: ["roas", currentOrgId, modelId],
     queryFn: () => analysis.roas(currentOrgId!, modelId),
     enabled: !!currentOrgId && !!modelId && isReady,
+    retry: 1,
   });
 
-  const { data: contribData, isLoading: contribLoading } = useQuery({
+  const { data: contribData, isLoading: contribLoading, error: contribError } = useQuery({
     queryKey: ["contributions", currentOrgId, modelId],
     queryFn: () => analysis.contributions(currentOrgId!, modelId),
     enabled: !!currentOrgId && !!modelId && isReady,
+    retry: 1,
   });
 
-  const { data: efficiencyData, isLoading: effLoading } = useQuery({
+  const { data: efficiencyData, isLoading: effLoading, error: effError } = useQuery({
     queryKey: ["spend-vs-contrib", currentOrgId, modelId],
     queryFn: () => analysis.spendVsContribution(currentOrgId!, modelId),
     enabled: !!currentOrgId && !!modelId && isReady,
+    retry: 1,
   });
 
-  const { data: tsData, isLoading: tsLoading } = useQuery({
+  const { data: tsData, isLoading: tsLoading, error: tsError } = useQuery({
     queryKey: ["contrib-ts", currentOrgId, modelId],
     queryFn: () => analysis.contributionsTimeseries(currentOrgId!, modelId),
     enabled: !!currentOrgId && !!modelId && isReady,
+    retry: 1,
   });
+
+  const analysisError = roasError || contribError || effError || tsError;
 
   // Derived insights
   const insights = useMemo(() => {
@@ -317,6 +323,17 @@ export default function ModelDetailPage() {
               {col.replace("spend_", "")}
             </Badge>
           ))}
+        </div>
+      )}
+
+      {/* Analysis Error Banner */}
+      {isReady && analysisError && (
+        <div className="flex items-start gap-3 p-4 rounded-lg border bg-red-50 border-red-200 text-red-800 dark:bg-red-950 dark:border-red-800 dark:text-red-200">
+          <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
+          <div className="text-sm">
+            <strong>Error loading analysis data:</strong>{" "}
+            {analysisError instanceof Error ? analysisError.message : "Unknown error. Check backend logs."}
+          </div>
         </div>
       )}
 
