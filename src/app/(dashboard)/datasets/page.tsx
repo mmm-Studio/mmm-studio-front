@@ -339,7 +339,7 @@ export default function DatasetsPage() {
               </CardTitle>
               <CardDescription>
                 Marketing data already stored in the <code className="text-xs bg-muted px-1 py-0.5 rounded">mmm_data</code> table.
-                Click &quot;Use for Training&quot; to import into a project.
+                Available for training models directly.
               </CardDescription>
             </CardHeader>
           </Card>
@@ -397,7 +397,7 @@ export default function DatasetsPage() {
                       </div>
                       <div className="flex items-center gap-1 text-xs text-muted-foreground">
                         <Calendar className="h-3 w-3" />
-                        {summary.min_date} \u2014 {summary.max_date}
+                        {summary.min_date} — {summary.max_date}
                       </div>
                       <div>
                         <p className="text-xs text-muted-foreground mb-1">Spend channels</p>
@@ -497,7 +497,7 @@ export default function DatasetsPage() {
                   <CardHeader>
                     <CardTitle className="text-base flex items-center gap-2">
                       <Eye className="h-4 w-4" />
-                      Data Preview \u2014 {previewCountry}
+                      Data Preview — {previewCountry}
                       <Badge variant="outline" className="ml-2 text-xs">
                         Latest 20 rows
                       </Badge>
@@ -538,19 +538,19 @@ export default function DatasetsPage() {
                                   {Number(row.spend_SEM).toLocaleString(undefined, { maximumFractionDigits: 0 })}
                                 </TableCell>
                                 <TableCell className="text-xs">
-                                  {row.spend_TikTok || "\u2014"}
+                                  {row.spend_TikTok || "—"}
                                 </TableCell>
                                 <TableCell className="text-xs font-medium">
                                   {Number(row.sales).toLocaleString(undefined, { maximumFractionDigits: 0 })}
                                 </TableCell>
                                 <TableCell className="text-xs">
-                                  {row.black_friday === "1" ? "\u2713" : "\u2014"}
+                                  {row.black_friday === "1" ? "✓" : "—"}
                                 </TableCell>
                                 <TableCell className="text-xs">
-                                  {row.christmas === "1" ? "\u2713" : "\u2014"}
+                                  {row.christmas === "1" ? "✓" : "—"}
                                 </TableCell>
                                 <TableCell className="text-xs">
-                                  {row.summer_sale === "1" ? "\u2713" : "\u2014"}
+                                  {row.summer_sale === "1" ? "✓" : "—"}
                                 </TableCell>
                               </TableRow>
                             ))}
@@ -666,7 +666,7 @@ export default function DatasetsPage() {
                       {ds.date_range && (
                         <div className="flex items-center gap-1 text-xs text-muted-foreground">
                           <Calendar className="h-3 w-3" />
-                          {ds.date_range.min} \u2014 {ds.date_range.max}
+                          {ds.date_range.min} — {ds.date_range.max}
                         </div>
                       )}
                     </CardContent>
