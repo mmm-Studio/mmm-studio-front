@@ -46,6 +46,20 @@ export default function OptimizationPage() {
 
   const [selectedProject, setSelectedProject] = useState("");
   const [selectedModel, setSelectedModel] = useState(preselectedModel);
+
+  const handleModelChange = (modelId: string) => {
+    setSelectedModel(modelId);
+    // Reset dates so they get re-populated from new model
+    setHStartDate("");
+    setHEndDate("");
+    setCP1Start("");
+    setCP1End("");
+    setCP2Start("");
+    setCP2End("");
+    setHistoricalResult(null);
+    setBudgetResult(null);
+    setCompareResult(null);
+  };
   const [activeTab, setActiveTab] = useState("historical");
 
   // Historical form
@@ -105,6 +119,23 @@ export default function OptimizationPage() {
   }
 
   const readyModels = modelList?.filter((m) => m.status === "ready") || [];
+
+  // When model changes, pre-fill dates from the model's training range
+  const currentModel = readyModels.find((m) => m.id === selectedModel);
+  const modelStartDate = currentModel?.start_date || "";
+  const modelEndDate = currentModel?.end_date || "";
+
+  // Auto-fill dates when model is selected and dates are empty
+  if (currentModel && !hStartDate && modelStartDate) {
+    setHStartDate(modelStartDate);
+  }
+  if (currentModel && !hEndDate && modelEndDate) {
+    // Use a date ~2 months before end as default end for historical opt
+    const endD = new Date(modelEndDate);
+    const testWeeks = currentModel?.config?.test_weeks || 8;
+    endD.setDate(endD.getDate() - testWeeks * 7);
+    setHEndDate(endD.toISOString().split("T")[0]);
+  }
 
   const historicalMut = useMutation({
     mutationFn: () => {
@@ -302,7 +333,7 @@ export default function OptimizationPage() {
         </div>
         <div className="space-y-1">
           <Label className="text-xs text-muted-foreground">Model</Label>
-          <Select value={selectedModel} onValueChange={setSelectedModel} disabled={!readyModels.length}>
+          <Select value={selectedModel} onValueChange={handleModelChange} disabled={!readyModels.length}>
             <SelectTrigger className="w-64">
               <SelectValue placeholder={readyModels.length ? "Select model" : "No ready models"} />
             </SelectTrigger>
@@ -349,17 +380,22 @@ export default function OptimizationPage() {
                 <div className="grid grid-cols-3 gap-4">
                   <div className="space-y-2">
                     <Label>Start Date</Label>
-                    <Input type="date" value={hStartDate} onChange={(e) => setHStartDate(e.target.value)} />
+                    <Input type="date" value={hStartDate} onChange={(e) => setHStartDate(e.target.value)} min={modelStartDate} max={modelEndDate} />
                   </div>
                   <div className="space-y-2">
                     <Label>End Date</Label>
-                    <Input type="date" value={hEndDate} onChange={(e) => setHEndDate(e.target.value)} />
+                    <Input type="date" value={hEndDate} onChange={(e) => setHEndDate(e.target.value)} min={modelStartDate} max={modelEndDate} />
                   </div>
                   <div className="space-y-2">
                     <Label>Budget Bounds (%)</Label>
                     <Input type="number" step="0.05" min="0" max="1" value={hBounds} onChange={(e) => setHBounds(Number(e.target.value))} />
                   </div>
                 </div>
+                {modelStartDate && (
+                  <p className="text-xs text-muted-foreground">
+                    Training data range: {modelStartDate} to {modelEndDate}
+                  </p>
+                )}
                 <Button
                   onClick={() => historicalMut.mutate()}
                   disabled={historicalMut.isPending || !hStartDate || !hEndDate}

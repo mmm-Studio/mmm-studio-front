@@ -1,13 +1,14 @@
 /**
  * API client for the MMM Backend.
  *
- * All requests include the Supabase JWT in the Authorization header.
- * The backend verifies this token and extracts the user context.
+ * All requests are proxied through /api/backend/* to avoid CORS issues.
+ * The proxy adds the Supabase JWT from the server-side session.
  */
 
 import { createClient } from "@/lib/supabase/client";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+// Use the Next.js API proxy to avoid CORS
+const API_BASE = "/api/backend";
 
 interface RequestOptions {
   method?: string;
@@ -51,6 +52,7 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
     method,
     headers: { ...authHeaders, ...headers },
     body: body ? JSON.stringify(body) : undefined,
+    credentials: "same-origin",
   });
 
   if (!res.ok) {
@@ -77,6 +79,7 @@ async function uploadFile<T>(path: string, formData: FormData): Promise<T> {
       Authorization: `Bearer ${session.access_token}`,
     },
     body: formData,
+    credentials: "same-origin",
   });
 
   if (!res.ok) {
