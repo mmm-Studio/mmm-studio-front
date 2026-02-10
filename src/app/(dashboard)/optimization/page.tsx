@@ -294,7 +294,7 @@ export default function OptimizationPage() {
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis dataKey="channel" tick={{ fontSize: 12 }} />
             <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => fmt(v)} />
-            <Tooltip formatter={(value: number) => [fmt(value), ""]} contentStyle={{ borderRadius: "8px", border: "1px solid #e2e8f0" }} />
+            <Tooltip formatter={(value) => [fmt(Number(value)), ""]} contentStyle={{ borderRadius: "8px", border: "1px solid #e2e8f0" }} />
             <Legend />
             <Bar dataKey="original" fill="#94a3b8" name="Original" radius={[4, 4, 0, 0]} />
             <Bar dataKey="optimized" fill="#6366f1" name="Optimized" radius={[4, 4, 0, 0]} />
@@ -435,7 +435,7 @@ export default function OptimizationPage() {
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis dataKey="channel" tick={{ fontSize: 12 }} />
             <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => fmt(v)} />
-            <Tooltip formatter={(value: number) => [fmt(value), ""]} contentStyle={{ borderRadius: "8px", border: "1px solid #e2e8f0" }} />
+            <Tooltip formatter={(value) => [fmt(Number(value)), ""]} contentStyle={{ borderRadius: "8px", border: "1px solid #e2e8f0" }} />
             <Legend />
             <Bar dataKey="baseline" fill="#94a3b8" name="Baseline/week" radius={[4, 4, 0, 0]} />
             <Bar dataKey="optimal" fill="#6366f1" name="Optimal/week" radius={[4, 4, 0, 0]} />
@@ -759,8 +759,8 @@ export default function OptimizationPage() {
                           <BarChart data={compChartData}>
                             <CartesianGrid strokeDasharray="3 3" />
                             <XAxis dataKey="channel" tick={{ fontSize: 12 }} />
-                            <YAxis tick={{ fontSize: 11 }} tickFormatter={(v: number) => fmt(v)} />
-                            <Tooltip formatter={(value: number) => [fmt(value), ""]} contentStyle={{ borderRadius: "8px", border: "1px solid #e2e8f0" }} />
+                            <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => fmt(v)} />
+                            <Tooltip formatter={(value) => [fmt(Number(value)), ""]} contentStyle={{ borderRadius: "8px", border: "1px solid #e2e8f0" }} />
                             <Legend />
                             <Bar dataKey="period1" fill="#94a3b8" name={`P1 (${cP1Start})`} radius={[4, 4, 0, 0]} />
                             <Bar dataKey="period2" fill="#6366f1" name={`P2 (${cP2Start})`} radius={[4, 4, 0, 0]} />
