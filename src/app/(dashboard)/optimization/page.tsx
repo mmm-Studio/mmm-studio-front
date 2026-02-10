@@ -7,6 +7,7 @@ import { useAuthStore } from "@/stores/auth-store";
 import { createClient } from "@/lib/supabase/client";
 import { optimization, scenarios, type HistoricalOptInput, type BudgetOptInput, type PeriodCompareInput } from "@/lib/api";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -37,6 +38,11 @@ import {
   ArrowDownRight,
   BarChart3,
   Target,
+  Info,
+  Award,
+  AlertTriangle,
+  Zap,
+  PieChartIcon,
 } from "lucide-react";
 import {
   BarChart,
@@ -48,12 +54,70 @@ import {
   ResponsiveContainer,
   Legend,
   Cell,
+  PieChart,
+  Pie,
+  RadialBarChart,
+  RadialBar,
 } from "recharts";
+
+const COLORS = [
+  "#6366f1", "#8b5cf6", "#a855f7", "#d946ef",
+  "#ec4899", "#f43f5e", "#ef4444", "#f97316",
+  "#eab308", "#22c55e", "#14b8a6", "#06b6d4",
+];
 
 function fmt(n: number): string {
   if (Math.abs(n) >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
   if (Math.abs(n) >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
   return n.toFixed(1);
+}
+
+function KpiCard({ title, value, subtitle, icon: Icon, color = "" }: {
+  title: string;
+  value: string | React.ReactNode;
+  subtitle?: string;
+  icon: React.ComponentType<{ className?: string }>;
+  color?: string;
+}) {
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between pb-2">
+        <CardTitle className="text-xs font-medium text-muted-foreground">{title}</CardTitle>
+        <Icon className="h-4 w-4 text-muted-foreground" />
+      </CardHeader>
+      <CardContent>
+        <div className={`text-2xl font-bold ${color}`}>{value}</div>
+        {subtitle && <p className="text-xs text-muted-foreground mt-1">{subtitle}</p>}
+      </CardContent>
+    </Card>
+  );
+}
+
+function InsightBanner({ type, children }: { type: "info" | "success" | "warning"; children: React.ReactNode }) {
+  const styles = {
+    info: "bg-blue-50 border-blue-200 text-blue-800 dark:bg-blue-950 dark:border-blue-800 dark:text-blue-200",
+    success: "bg-green-50 border-green-200 text-green-800 dark:bg-green-950 dark:border-green-800 dark:text-green-200",
+    warning: "bg-amber-50 border-amber-200 text-amber-800 dark:bg-amber-950 dark:border-amber-800 dark:text-amber-200",
+  };
+  const icons = { info: Info, success: Award, warning: AlertTriangle };
+  const Icon = icons[type];
+  return (
+    <div className={`flex items-start gap-3 p-4 rounded-lg border ${styles[type]}`}>
+      <Icon className="h-4 w-4 mt-0.5 shrink-0" />
+      <div className="text-sm leading-relaxed">{children}</div>
+    </div>
+  );
+}
+
+function DeltaIndicator({ value, suffix = "%", positiveIsGood = true }: { value: number; suffix?: string; positiveIsGood?: boolean }) {
+  const isPositive = value > 0;
+  const isGood = positiveIsGood ? isPositive : !isPositive;
+  return (
+    <span className={`inline-flex items-center gap-1 text-xs font-medium ${isGood ? "text-green-600" : value === 0 ? "text-muted-foreground" : "text-red-500"}`}>
+      {isPositive ? <ArrowUpRight className="h-3 w-3" /> : value < 0 ? <ArrowDownRight className="h-3 w-3" /> : null}
+      {isPositive ? "+" : ""}{value.toFixed(1)}{suffix}
+    </span>
+  );
 }
 
 export default function OptimizationPage() {
@@ -227,50 +291,69 @@ export default function OptimizationPage() {
     const optResp = r.optimized_response as number;
     const totalOriginal = Object.values(original).reduce((s, v) => s + v, 0);
     const totalOptimized = Object.values(optimized).reduce((s, v) => s + v, 0);
+    const increaseChannels = chartData.filter(c => c.change > 2);
+    const decreaseChannels = chartData.filter(c => c.change < -2);
+    const maintainChannels = chartData.filter(c => Math.abs(c.change) <= 2);
+
+    // Pie data
+    const origPie = chartData.map((c, i) => ({ name: c.channel, value: c.original, fill: COLORS[i % COLORS.length] }));
+    const optPie = chartData.map((c, i) => ({ name: c.channel, value: c.optimized, fill: COLORS[i % COLORS.length] }));
 
     return (
       <div className="space-y-6 mt-6">
-        {/* KPI cards */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-xs font-medium text-muted-foreground">Uplift</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className={`text-2xl font-bold flex items-center gap-1 ${uplift > 0 ? "text-green-600" : "text-red-600"}`}>
-                {uplift > 0 ? <ArrowUpRight className="h-5 w-5" /> : <ArrowDownRight className="h-5 w-5" />}
-                {Number(uplift).toFixed(1)}%
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-xs font-medium text-muted-foreground">Original Response</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{fmt(origResp || 0)}</div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-xs font-medium text-muted-foreground">Optimized Response</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-green-600">{fmt(optResp || 0)}</div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-xs font-medium text-muted-foreground">Total Budget</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{fmt(totalOriginal)}</div>
-              <p className="text-xs text-muted-foreground">Same budget, better allocation</p>
-            </CardContent>
-          </Card>
+        {/* KPI cards - Enhanced */}
+        <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+          <KpiCard
+            title="Revenue Uplift"
+            value={<span className="flex items-center gap-1">{uplift > 0 ? <ArrowUpRight className="h-5 w-5" /> : <ArrowDownRight className="h-5 w-5" />}{Number(uplift).toFixed(1)}%</span>}
+            icon={Zap}
+            color={uplift > 0 ? "text-green-600" : "text-red-600"}
+            subtitle="Same budget, smarter allocation"
+          />
+          <KpiCard
+            title="Original Response"
+            value={fmt(origResp || 0)}
+            icon={Target}
+            subtitle="Actual revenue achieved"
+          />
+          <KpiCard
+            title="Optimized Response"
+            value={fmt(optResp || 0)}
+            icon={TrendingUp}
+            color="text-green-600"
+            subtitle={`+${fmt((optResp || 0) - (origResp || 0))} additional revenue`}
+          />
+          <KpiCard
+            title="Total Budget"
+            value={fmt(totalOriginal)}
+            icon={DollarSign}
+            subtitle="Budget held constant"
+          />
+          <KpiCard
+            title="Channels Moved"
+            value={`${increaseChannels.length}↑ ${decreaseChannels.length}↓`}
+            icon={BarChart3}
+            subtitle={`${maintainChannels.length} unchanged`}
+          />
         </div>
 
-        {/* Chart + save */}
+        {/* Insight banners */}
+        <div className="grid gap-3 sm:grid-cols-2">
+          {increaseChannels.length > 0 && (
+            <InsightBanner type="success">
+              <strong>Increase budget for:</strong>{" "}
+              {increaseChannels.map(c => `${c.channel} (+${c.change.toFixed(0)}%)`).join(", ")}
+            </InsightBanner>
+          )}
+          {decreaseChannels.length > 0 && (
+            <InsightBanner type="warning">
+              <strong>Reduce budget for:</strong>{" "}
+              {decreaseChannels.map(c => `${c.channel} (${c.change.toFixed(0)}%)`).join(", ")}
+            </InsightBanner>
+          )}
+        </div>
+
+        {/* Save button */}
         <div className="flex items-center justify-end">
           <Button
             variant="outline"
@@ -289,6 +372,7 @@ export default function OptimizationPage() {
           </Button>
         </div>
 
+        {/* Bar Chart */}
         <ResponsiveContainer width="100%" height={350}>
           <BarChart data={chartData}>
             <CartesianGrid strokeDasharray="3 3" />
@@ -301,6 +385,70 @@ export default function OptimizationPage() {
           </BarChart>
         </ResponsiveContainer>
 
+        {/* Allocation Pies: Original vs Optimized */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm">Original Allocation</CardTitle>
+              <CardDescription className="text-xs">How budget was actually distributed</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={280}>
+                <PieChart>
+                  <Pie data={origPie} cx="50%" cy="50%" outerRadius={100} innerRadius={40} dataKey="value" label={({ name, percent }) => `${name}: ${((percent ?? 0) * 100).toFixed(0)}%`} labelLine>
+                    {origPie.map((entry, i) => <Cell key={i} fill={entry.fill} />)}
+                  </Pie>
+                  <Tooltip formatter={(value) => [fmt(Number(value)), ""]} />
+                </PieChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm">Optimized Allocation</CardTitle>
+              <CardDescription className="text-xs">How the optimizer recommends distributing budget</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={280}>
+                <PieChart>
+                  <Pie data={optPie} cx="50%" cy="50%" outerRadius={100} innerRadius={40} dataKey="value" label={({ name, percent }) => `${name}: ${((percent ?? 0) * 100).toFixed(0)}%`} labelLine>
+                    {optPie.map((entry, i) => <Cell key={i} fill={entry.fill} />)}
+                  </Pie>
+                  <Tooltip formatter={(value) => [fmt(Number(value)), ""]} />
+                </PieChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Change magnitude bars */}
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm">Budget Reallocation Magnitude</CardTitle>
+            <CardDescription className="text-xs">How much each channel changes from original allocation</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              {chartData.map((row, i) => (
+                <div key={row.channel} className="flex items-center gap-3">
+                  <span className="text-xs font-medium w-20 truncate">{row.channel}</span>
+                  <div className="flex-1 flex items-center">
+                    <div className="relative w-full h-6 bg-muted rounded-full overflow-hidden">
+                      {row.change >= 0 ? (
+                        <div className="absolute left-1/2 top-0 h-full bg-green-500 rounded-r-full" style={{ width: `${Math.min(Math.abs(row.change), 50)}%` }} />
+                      ) : (
+                        <div className="absolute right-1/2 top-0 h-full bg-red-400 rounded-l-full" style={{ width: `${Math.min(Math.abs(row.change), 50)}%` }} />
+                      )}
+                      <div className="absolute left-1/2 top-0 h-full w-px bg-border" />
+                    </div>
+                  </div>
+                  <DeltaIndicator value={row.change} />
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+
         {/* Detailed table */}
         <div className="rounded-md border overflow-auto">
           <Table>
@@ -311,6 +459,7 @@ export default function OptimizationPage() {
                 <TableHead className="text-right">Optimized</TableHead>
                 <TableHead className="text-right">Difference</TableHead>
                 <TableHead className="text-right">Change</TableHead>
+                <TableHead className="text-right">Action</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -320,11 +469,12 @@ export default function OptimizationPage() {
                   <TableCell className="text-right">{fmt(row.original)}</TableCell>
                   <TableCell className="text-right">{fmt(row.optimized)}</TableCell>
                   <TableCell className="text-right">{fmt(row.optimized - row.original)}</TableCell>
+                  <TableCell className="text-right"><DeltaIndicator value={row.change} /></TableCell>
                   <TableCell className="text-right">
-                    <span className={`inline-flex items-center gap-1 text-xs font-medium ${row.change > 0 ? "text-green-600" : row.change < 0 ? "text-red-600" : "text-muted-foreground"}`}>
-                      {row.change > 0 ? <ArrowUpRight className="h-3 w-3" /> : row.change < 0 ? <ArrowDownRight className="h-3 w-3" /> : null}
-                      {row.change > 0 ? "+" : ""}{row.change.toFixed(1)}%
-                    </span>
+                    <Badge variant={row.change > 2 ? "outline" : row.change < -2 ? "secondary" : "default"}
+                      className={row.change > 2 ? "border-green-300 text-green-700" : row.change < -2 ? "text-red-600" : ""}>
+                      {row.change > 2 ? "Increase" : row.change < -2 ? "Decrease" : "Maintain"}
+                    </Badge>
                   </TableCell>
                 </TableRow>
               ))}
@@ -333,6 +483,7 @@ export default function OptimizationPage() {
                 <TableCell className="text-right">{fmt(totalOriginal)}</TableCell>
                 <TableCell className="text-right">{fmt(totalOptimized)}</TableCell>
                 <TableCell className="text-right">{fmt(totalOptimized - totalOriginal)}</TableCell>
+                <TableCell className="text-right">—</TableCell>
                 <TableCell className="text-right">—</TableCell>
               </TableRow>
             </TableBody>
@@ -366,48 +517,74 @@ export default function OptimizationPage() {
       optimal: Math.round(optimal[ch]),
       change: changePct[ch] || 0,
       total: Math.round(optimalTotal[ch] || 0),
-    })).sort((a, b) => b.change - a.change);
+    })).sort((a, b) => b.optimal - a.optimal);
+
+    const increaseChannels = chartData.filter(c => c.change > 5);
+    const decreaseChannels = chartData.filter(c => c.change < -5);
+    const allocPie = chartData.map((c, i) => ({ name: c.channel, value: c.optimal, fill: COLORS[i % COLORS.length] }));
+    const topChannel = chartData[0];
+    const topChannelPct = totalOptimal > 0 ? (topChannel.optimal / totalOptimal * 100) : 0;
 
     return (
       <div className="space-y-6 mt-6">
-        {/* KPI cards */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-xs font-medium text-muted-foreground">Expected Response</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-green-600">{fmt(respMean || 0)}</div>
-              {respCi5 != null && respCi95 != null && (
-                <p className="text-xs text-muted-foreground">CI: {fmt(respCi5)} — {fmt(respCi95)}</p>
-              )}
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-xs font-medium text-muted-foreground">Expected ROAS</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{Number(expectedRoas || 0).toFixed(2)}x</div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-xs font-medium text-muted-foreground">Weekly Budget</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{fmt(totalOptimal)}</div>
-              <p className="text-xs text-muted-foreground">per week</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-xs font-medium text-muted-foreground">Channels</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{channels.length}</div>
-            </CardContent>
-          </Card>
+        {/* KPI cards - Enhanced */}
+        <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+          <KpiCard
+            title="Expected Response"
+            value={fmt(respMean || 0)}
+            icon={Target}
+            color="text-green-600"
+            subtitle={respCi5 != null && respCi95 != null ? `CI: ${fmt(respCi5)} — ${fmt(respCi95)}` : `Over ${bNumWeeks} weeks`}
+          />
+          <KpiCard
+            title="Expected ROAS"
+            value={`${Number(expectedRoas || 0).toFixed(2)}x`}
+            icon={TrendingUp}
+            color={expectedRoas >= 1 ? "text-green-600" : "text-amber-600"}
+            subtitle={expectedRoas >= 1 ? "Profitable allocation" : "Below breakeven"}
+          />
+          <KpiCard
+            title="Weekly Budget"
+            value={fmt(totalOptimal)}
+            icon={DollarSign}
+            subtitle={`${fmt(bTotalBudget)} total / ${bNumWeeks} weeks`}
+          />
+          <KpiCard
+            title="Top Channel"
+            value={`${topChannelPct.toFixed(0)}%`}
+            icon={Award}
+            subtitle={topChannel.channel}
+          />
+          <KpiCard
+            title="Channels"
+            value={`${channels.length}`}
+            icon={PieChartIcon}
+            subtitle={`${increaseChannels.length} up, ${decreaseChannels.length} down`}
+          />
+        </div>
+
+        {/* Insight banners */}
+        <div className="grid gap-3 sm:grid-cols-2">
+          {expectedRoas >= 1 && (
+            <InsightBanner type="success">
+              <strong>Profitable allocation!</strong> Expected ROAS of {Number(expectedRoas).toFixed(2)}x means every dollar invested returns ${Number(expectedRoas).toFixed(2)}.
+            </InsightBanner>
+          )}
+          {topChannelPct > 40 && (
+            <InsightBanner type="info">
+              <strong>{topChannel.channel}</strong> receives {topChannelPct.toFixed(0)}% of the budget — high concentration. The model sees this as the highest-return channel.
+            </InsightBanner>
+          )}
+          {increaseChannels.length > 0 && (
+            <InsightBanner type="success">
+              <strong>Scale up:</strong> {increaseChannels.map(c => c.channel).join(", ")} — optimizer allocates more budget to these high-return channels.
+            </InsightBanner>
+          )}
+          {decreaseChannels.length > 0 && (
+            <InsightBanner type="warning">
+              <strong>Scale down:</strong> {decreaseChannels.map(c => c.channel).join(", ")} — lower marginal returns suggest reducing investment.
+            </InsightBanner>
+          )}
         </div>
 
         {/* Save button */}
@@ -429,18 +606,82 @@ export default function OptimizationPage() {
           </Button>
         </div>
 
-        {/* Chart */}
-        <ResponsiveContainer width="100%" height={350}>
-          <BarChart data={chartData}>
-            <CartesianGrid strokeDasharray="3 3" />
-            <XAxis dataKey="channel" tick={{ fontSize: 12 }} />
-            <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => fmt(v)} />
-            <Tooltip formatter={(value) => [fmt(Number(value)), ""]} contentStyle={{ borderRadius: "8px", border: "1px solid #e2e8f0" }} />
-            <Legend />
-            <Bar dataKey="baseline" fill="#94a3b8" name="Baseline/week" radius={[4, 4, 0, 0]} />
-            <Bar dataKey="optimal" fill="#6366f1" name="Optimal/week" radius={[4, 4, 0, 0]} />
-          </BarChart>
-        </ResponsiveContainer>
+        {/* Charts: Bar + Pie */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          <Card className="lg:col-span-2">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm">Baseline vs Optimal Weekly Spend</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={350}>
+                <BarChart data={chartData}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="channel" tick={{ fontSize: 12 }} />
+                  <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => fmt(v)} />
+                  <Tooltip formatter={(value) => [fmt(Number(value)), ""]} contentStyle={{ borderRadius: "8px", border: "1px solid #e2e8f0" }} />
+                  <Legend />
+                  <Bar dataKey="baseline" fill="#94a3b8" name="Baseline/week" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="optimal" fill="#6366f1" name="Optimal/week" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm">Optimal Allocation Mix</CardTitle>
+              <CardDescription className="text-xs">Weekly budget distribution</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={280}>
+                <PieChart>
+                  <Pie data={allocPie} cx="50%" cy="50%" outerRadius={95} innerRadius={35} dataKey="value" label={({ name, percent }) => `${name}: ${((percent ?? 0) * 100).toFixed(0)}%`} labelLine>
+                    {allocPie.map((entry, i) => <Cell key={i} fill={entry.fill} />)}
+                  </Pie>
+                  <Tooltip formatter={(value) => [fmt(Number(value)), "per week"]} />
+                </PieChart>
+              </ResponsiveContainer>
+              <div className="space-y-1 mt-2">
+                {allocPie.map((item, i) => (
+                  <div key={item.name} className="flex items-center justify-between text-xs">
+                    <div className="flex items-center gap-1.5">
+                      <div className="h-2 w-2 rounded-full" style={{ backgroundColor: item.fill }} />
+                      <span>{item.name}</span>
+                    </div>
+                    <span className="font-medium">{fmt(item.value)}/wk</span>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Change magnitude */}
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm">Budget Shift from Baseline</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              {[...chartData].sort((a, b) => b.change - a.change).map((row) => (
+                <div key={row.channel} className="flex items-center gap-3">
+                  <span className="text-xs font-medium w-20 truncate">{row.channel}</span>
+                  <div className="flex-1 flex items-center">
+                    <div className="relative w-full h-5 bg-muted rounded-full overflow-hidden">
+                      {row.change >= 0 ? (
+                        <div className="absolute left-1/2 top-0 h-full bg-green-500 rounded-r-full" style={{ width: `${Math.min(Math.abs(row.change) / 2, 50)}%` }} />
+                      ) : (
+                        <div className="absolute right-1/2 top-0 h-full bg-red-400 rounded-l-full" style={{ width: `${Math.min(Math.abs(row.change) / 2, 50)}%` }} />
+                      )}
+                      <div className="absolute left-1/2 top-0 h-full w-px bg-border" />
+                    </div>
+                  </div>
+                  <DeltaIndicator value={row.change} />
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Allocation table */}
         <div className="rounded-md border overflow-auto">
@@ -452,7 +693,7 @@ export default function OptimizationPage() {
                 <TableHead className="text-right">Optimal/wk</TableHead>
                 <TableHead className="text-right">Total ({bNumWeeks}wk)</TableHead>
                 <TableHead className="text-right">Change</TableHead>
-                <TableHead className="text-right">Direction</TableHead>
+                <TableHead className="text-right">Action</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -462,15 +703,12 @@ export default function OptimizationPage() {
                   <TableCell className="text-right">{fmt(row.baseline)}</TableCell>
                   <TableCell className="text-right">{fmt(row.optimal)}</TableCell>
                   <TableCell className="text-right">{fmt(row.total)}</TableCell>
+                  <TableCell className="text-right"><DeltaIndicator value={row.change} /></TableCell>
                   <TableCell className="text-right">
-                    <span className={`text-xs font-medium ${row.change > 0 ? "text-green-600" : row.change < 0 ? "text-red-600" : "text-muted-foreground"}`}>
-                      {row.change > 0 ? "+" : ""}{row.change.toFixed(1)}%
-                    </span>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <span className={`inline-flex items-center gap-1 text-xs ${row.change > 5 ? "text-green-600" : row.change < -5 ? "text-red-600" : "text-muted-foreground"}`}>
-                      {row.change > 5 ? <><ArrowUpRight className="h-3 w-3" />Increase</> : row.change < -5 ? <><ArrowDownRight className="h-3 w-3" />Decrease</> : "Maintain"}
-                    </span>
+                    <Badge variant={row.change > 5 ? "outline" : row.change < -5 ? "secondary" : "default"}
+                      className={row.change > 5 ? "border-green-300 text-green-700" : row.change < -5 ? "text-red-600" : ""}>
+                      {row.change > 5 ? "Scale Up" : row.change < -5 ? "Scale Down" : "Maintain"}
+                    </Badge>
                   </TableCell>
                 </TableRow>
               ))}
@@ -676,10 +914,14 @@ export default function OptimizationPage() {
                 </Button>
                 {compareResult && (() => {
                   const cr = compareResult as Record<string, unknown>;
-                  const p1Spend = cr.period1_spend as Record<string, number> || {};
-                  const p2Spend = cr.period2_spend as Record<string, number> || {};
-                  const p1Resp = cr.period1_response as number;
-                  const p2Resp = cr.period2_response as number;
+                  const p1 = cr.period1 as Record<string, unknown> || {};
+                  const p2 = cr.period2 as Record<string, unknown> || {};
+                  const comparison = cr.comparison as Record<string, unknown> || {};
+                  // Try structured response first, fall back to flat keys
+                  const p1Spend = (p1.spend_by_channel || cr.period1_spend) as Record<string, number> || {};
+                  const p2Spend = (p2.spend_by_channel || cr.period2_spend) as Record<string, number> || {};
+                  const p1Resp = (p1.total_response || cr.period1_response) as number || 0;
+                  const p2Resp = (p2.total_response || cr.period2_response) as number || 0;
                   const channels = Object.keys(p1Spend);
                   const compChartData = channels.map((ch) => ({
                     channel: ch.replace("spend_", ""),
@@ -690,50 +932,68 @@ export default function OptimizationPage() {
                   const totalP2 = Object.values(p2Spend).reduce((s, v) => s + v, 0);
                   const spendChange = totalP1 > 0 ? ((totalP2 - totalP1) / totalP1 * 100) : 0;
                   const respChange = p1Resp > 0 ? ((p2Resp - p1Resp) / p1Resp * 100) : 0;
+                  const p1Roas = totalP1 > 0 ? p1Resp / totalP1 : 0;
+                  const p2Roas = totalP2 > 0 ? p2Resp / totalP2 : 0;
+                  const roasChange = p1Roas > 0 ? ((p2Roas - p1Roas) / p1Roas * 100) : 0;
+                  // Find biggest movers
+                  const channelChanges = compChartData.map(c => {
+                    const diff = c.period2 - c.period1;
+                    const pct = c.period1 > 0 ? (diff / c.period1 * 100) : 0;
+                    return { ...c, diff, pct };
+                  }).sort((a, b) => Math.abs(b.pct) - Math.abs(a.pct));
+                  const biggestIncrease = channelChanges.find(c => c.pct > 0);
+                  const biggestDecrease = channelChanges.find(c => c.pct < 0);
 
                   return (
                     <div className="space-y-6 mt-6">
-                      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                        <Card>
-                          <CardHeader className="pb-2">
-                            <CardTitle className="text-xs font-medium text-muted-foreground">P1 Total Spend</CardTitle>
-                          </CardHeader>
-                          <CardContent>
-                            <div className="text-2xl font-bold">{fmt(totalP1)}</div>
-                            <p className="text-xs text-muted-foreground">{cP1Start} — {cP1End}</p>
-                          </CardContent>
-                        </Card>
-                        <Card>
-                          <CardHeader className="pb-2">
-                            <CardTitle className="text-xs font-medium text-muted-foreground">P2 Total Spend</CardTitle>
-                          </CardHeader>
-                          <CardContent>
-                            <div className="text-2xl font-bold">{fmt(totalP2)}</div>
-                            <p className="text-xs text-muted-foreground">{cP2Start} — {cP2End}</p>
-                          </CardContent>
-                        </Card>
-                        <Card>
-                          <CardHeader className="pb-2">
-                            <CardTitle className="text-xs font-medium text-muted-foreground">Spend Change</CardTitle>
-                          </CardHeader>
-                          <CardContent>
-                            <div className={`text-2xl font-bold flex items-center gap-1 ${spendChange > 0 ? "text-amber-600" : "text-green-600"}`}>
-                              {spendChange > 0 ? <ArrowUpRight className="h-5 w-5" /> : <ArrowDownRight className="h-5 w-5" />}
-                              {spendChange > 0 ? "+" : ""}{spendChange.toFixed(1)}%
-                            </div>
-                          </CardContent>
-                        </Card>
-                        <Card>
-                          <CardHeader className="pb-2">
-                            <CardTitle className="text-xs font-medium text-muted-foreground">Response Change</CardTitle>
-                          </CardHeader>
-                          <CardContent>
-                            <div className={`text-2xl font-bold flex items-center gap-1 ${respChange > 0 ? "text-green-600" : "text-red-600"}`}>
-                              {respChange > 0 ? <ArrowUpRight className="h-5 w-5" /> : <ArrowDownRight className="h-5 w-5" />}
-                              {respChange > 0 ? "+" : ""}{respChange.toFixed(1)}%
-                            </div>
-                          </CardContent>
-                        </Card>
+                      {/* Enhanced KPI cards */}
+                      <div className="grid grid-cols-2 lg:grid-cols-6 gap-4">
+                        <KpiCard title="P1 Spend" value={fmt(totalP1)} icon={DollarSign} subtitle={`${cP1Start} — ${cP1End}`} />
+                        <KpiCard title="P2 Spend" value={fmt(totalP2)} icon={DollarSign} subtitle={`${cP2Start} — ${cP2End}`} />
+                        <KpiCard
+                          title="Spend Change"
+                          value={<span className="flex items-center gap-1">{spendChange > 0 ? <ArrowUpRight className="h-4 w-4" /> : <ArrowDownRight className="h-4 w-4" />}{Math.abs(spendChange).toFixed(1)}%</span>}
+                          icon={BarChart3}
+                          color={spendChange > 0 ? "text-amber-600" : "text-green-600"}
+                        />
+                        <KpiCard
+                          title="Response Change"
+                          value={<span className="flex items-center gap-1">{respChange > 0 ? <ArrowUpRight className="h-4 w-4" /> : <ArrowDownRight className="h-4 w-4" />}{Math.abs(respChange).toFixed(1)}%</span>}
+                          icon={Target}
+                          color={respChange > 0 ? "text-green-600" : "text-red-500"}
+                        />
+                        <KpiCard title="P1 ROAS" value={`${p1Roas.toFixed(2)}x`} icon={TrendingUp} />
+                        <KpiCard
+                          title="P2 ROAS"
+                          value={`${p2Roas.toFixed(2)}x`}
+                          icon={TrendingUp}
+                          color={p2Roas > p1Roas ? "text-green-600" : "text-red-500"}
+                          subtitle={`${roasChange > 0 ? "+" : ""}${roasChange.toFixed(1)}% vs P1`}
+                        />
+                      </div>
+
+                      {/* Insight banners */}
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        {respChange > 0 && spendChange <= respChange && (
+                          <InsightBanner type="success">
+                            <strong>Efficiency improved!</strong> Response grew {respChange.toFixed(1)}% while spend {spendChange > 0 ? `only grew ${spendChange.toFixed(1)}%` : `decreased ${Math.abs(spendChange).toFixed(1)}%`}.
+                          </InsightBanner>
+                        )}
+                        {respChange < 0 && spendChange > 0 && (
+                          <InsightBanner type="warning">
+                            <strong>Efficiency declined.</strong> Spend increased {spendChange.toFixed(1)}% but response dropped {Math.abs(respChange).toFixed(1)}%. Review channel allocation.
+                          </InsightBanner>
+                        )}
+                        {biggestIncrease && (
+                          <InsightBanner type="info">
+                            <strong>Biggest increase:</strong> {biggestIncrease.channel} grew {biggestIncrease.pct.toFixed(0)}% ({fmt(biggestIncrease.diff)} more spend).
+                          </InsightBanner>
+                        )}
+                        {biggestDecrease && (
+                          <InsightBanner type="info">
+                            <strong>Biggest decrease:</strong> {biggestDecrease.channel} fell {Math.abs(biggestDecrease.pct).toFixed(0)}% ({fmt(Math.abs(biggestDecrease.diff))} less spend).
+                          </InsightBanner>
+                        )}
                       </div>
 
                       <div className="flex items-center justify-end">
@@ -768,6 +1028,33 @@ export default function OptimizationPage() {
                         </ResponsiveContainer>
                       )}
 
+                      {/* Per-channel change bars */}
+                      <Card>
+                        <CardHeader className="pb-2">
+                          <CardTitle className="text-sm">Channel Spend Changes: P1 vs P2</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="space-y-2">
+                            {channelChanges.map((row) => (
+                              <div key={row.channel} className="flex items-center gap-3">
+                                <span className="text-xs font-medium w-20 truncate">{row.channel}</span>
+                                <div className="flex-1 flex items-center">
+                                  <div className="relative w-full h-5 bg-muted rounded-full overflow-hidden">
+                                    {row.pct >= 0 ? (
+                                      <div className="absolute left-1/2 top-0 h-full bg-indigo-500 rounded-r-full" style={{ width: `${Math.min(Math.abs(row.pct) / 2, 50)}%` }} />
+                                    ) : (
+                                      <div className="absolute right-1/2 top-0 h-full bg-slate-400 rounded-l-full" style={{ width: `${Math.min(Math.abs(row.pct) / 2, 50)}%` }} />
+                                    )}
+                                    <div className="absolute left-1/2 top-0 h-full w-px bg-border" />
+                                  </div>
+                                </div>
+                                <DeltaIndicator value={row.pct} />
+                              </div>
+                            ))}
+                          </div>
+                        </CardContent>
+                      </Card>
+
                       <div className="rounded-md border overflow-auto">
                         <Table>
                           <TableHeader>
@@ -777,26 +1064,33 @@ export default function OptimizationPage() {
                               <TableHead className="text-right">Period 2</TableHead>
                               <TableHead className="text-right">Difference</TableHead>
                               <TableHead className="text-right">Change</TableHead>
+                              <TableHead className="text-right">Direction</TableHead>
                             </TableRow>
                           </TableHeader>
                           <TableBody>
-                            {compChartData.map((row) => {
-                              const diff = row.period2 - row.period1;
-                              const pctChange = row.period1 > 0 ? (diff / row.period1 * 100) : 0;
-                              return (
-                                <TableRow key={row.channel}>
-                                  <TableCell className="font-medium">{row.channel}</TableCell>
-                                  <TableCell className="text-right">{fmt(row.period1)}</TableCell>
-                                  <TableCell className="text-right">{fmt(row.period2)}</TableCell>
-                                  <TableCell className="text-right">{fmt(diff)}</TableCell>
-                                  <TableCell className="text-right">
-                                    <span className={`inline-flex items-center gap-1 text-xs font-medium ${pctChange > 0 ? "text-green-600" : pctChange < 0 ? "text-red-600" : "text-muted-foreground"}`}>
-                                      {pctChange > 0 ? "+" : ""}{pctChange.toFixed(1)}%
-                                    </span>
-                                  </TableCell>
-                                </TableRow>
-                              );
-                            })}
+                            {channelChanges.map((row) => (
+                              <TableRow key={row.channel}>
+                                <TableCell className="font-medium">{row.channel}</TableCell>
+                                <TableCell className="text-right">{fmt(row.period1)}</TableCell>
+                                <TableCell className="text-right">{fmt(row.period2)}</TableCell>
+                                <TableCell className="text-right">{fmt(row.diff)}</TableCell>
+                                <TableCell className="text-right"><DeltaIndicator value={row.pct} /></TableCell>
+                                <TableCell className="text-right">
+                                  <Badge variant={row.pct > 5 ? "outline" : row.pct < -5 ? "secondary" : "default"}
+                                    className={row.pct > 5 ? "border-indigo-300 text-indigo-700" : row.pct < -5 ? "text-slate-600" : ""}>
+                                    {row.pct > 5 ? "Increased" : row.pct < -5 ? "Decreased" : "Stable"}
+                                  </Badge>
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                            <TableRow className="font-bold border-t-2">
+                              <TableCell>Total</TableCell>
+                              <TableCell className="text-right">{fmt(totalP1)}</TableCell>
+                              <TableCell className="text-right">{fmt(totalP2)}</TableCell>
+                              <TableCell className="text-right">{fmt(totalP2 - totalP1)}</TableCell>
+                              <TableCell className="text-right"><DeltaIndicator value={spendChange} /></TableCell>
+                              <TableCell className="text-right">—</TableCell>
+                            </TableRow>
                           </TableBody>
                         </Table>
                       </div>
