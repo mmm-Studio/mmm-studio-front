@@ -13,6 +13,14 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -27,6 +35,8 @@ import {
   DollarSign,
   ArrowUpRight,
   ArrowDownRight,
+  BarChart3,
+  Target,
 } from "lucide-react";
 import {
   BarChart,
@@ -37,7 +47,14 @@ import {
   Tooltip,
   ResponsiveContainer,
   Legend,
+  Cell,
 } from "recharts";
+
+function fmt(n: number): string {
+  if (Math.abs(n) >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+  if (Math.abs(n) >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
+  return n.toFixed(1);
+}
 
 export default function OptimizationPage() {
   const searchParams = useSearchParams();
@@ -198,25 +215,63 @@ export default function OptimizationPage() {
     const r = historicalResult as Record<string, Record<string, number> | number>;
     const original = r.original_spend as Record<string, number> || {};
     const optimized = r.optimized_spend as Record<string, number> || {};
+    const multipliers = r.multipliers as Record<string, number> || {};
     const chartData = Object.keys(original).map((ch) => ({
       channel: ch.replace("spend_", ""),
       original: Math.round(original[ch]),
       optimized: Math.round(optimized[ch]),
-    }));
+      change: multipliers[ch] ? ((multipliers[ch] - 1) * 100) : 0,
+    })).sort((a, b) => b.change - a.change);
     const uplift = r.uplift_pct as number;
+    const origResp = r.original_response as number;
+    const optResp = r.optimized_response as number;
+    const totalOriginal = Object.values(original).reduce((s, v) => s + v, 0);
+    const totalOptimized = Object.values(optimized).reduce((s, v) => s + v, 0);
 
     return (
-      <div className="space-y-4 mt-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Card className="p-3">
-              <div className="text-xs text-muted-foreground">Uplift</div>
-              <div className={`text-xl font-bold flex items-center gap-1 ${uplift > 0 ? "text-green-600" : "text-red-600"}`}>
-                {uplift > 0 ? <ArrowUpRight className="h-4 w-4" /> : <ArrowDownRight className="h-4 w-4" />}
+      <div className="space-y-6 mt-6">
+        {/* KPI cards */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-xs font-medium text-muted-foreground">Uplift</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className={`text-2xl font-bold flex items-center gap-1 ${uplift > 0 ? "text-green-600" : "text-red-600"}`}>
+                {uplift > 0 ? <ArrowUpRight className="h-5 w-5" /> : <ArrowDownRight className="h-5 w-5" />}
                 {Number(uplift).toFixed(1)}%
               </div>
-            </Card>
-          </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-xs font-medium text-muted-foreground">Original Response</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{fmt(origResp || 0)}</div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-xs font-medium text-muted-foreground">Optimized Response</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-green-600">{fmt(optResp || 0)}</div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-xs font-medium text-muted-foreground">Total Budget</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{fmt(totalOriginal)}</div>
+              <p className="text-xs text-muted-foreground">Same budget, better allocation</p>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Chart + save */}
+        <div className="flex items-center justify-end">
           <Button
             variant="outline"
             size="sm"
@@ -233,49 +288,130 @@ export default function OptimizationPage() {
             Save Scenario
           </Button>
         </div>
+
         <ResponsiveContainer width="100%" height={350}>
           <BarChart data={chartData}>
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis dataKey="channel" tick={{ fontSize: 12 }} />
-            <YAxis tick={{ fontSize: 12 }} />
-            <Tooltip />
+            <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => fmt(v)} />
+            <Tooltip formatter={(value: number) => [fmt(value), ""]} contentStyle={{ borderRadius: "8px", border: "1px solid #e2e8f0" }} />
             <Legend />
-            <Bar dataKey="original" fill="#94a3b8" name="Original" />
-            <Bar dataKey="optimized" fill="#6366f1" name="Optimized" />
+            <Bar dataKey="original" fill="#94a3b8" name="Original" radius={[4, 4, 0, 0]} />
+            <Bar dataKey="optimized" fill="#6366f1" name="Optimized" radius={[4, 4, 0, 0]} />
           </BarChart>
         </ResponsiveContainer>
+
+        {/* Detailed table */}
+        <div className="rounded-md border overflow-auto">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Channel</TableHead>
+                <TableHead className="text-right">Original</TableHead>
+                <TableHead className="text-right">Optimized</TableHead>
+                <TableHead className="text-right">Difference</TableHead>
+                <TableHead className="text-right">Change</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {chartData.map((row) => (
+                <TableRow key={row.channel}>
+                  <TableCell className="font-medium">{row.channel}</TableCell>
+                  <TableCell className="text-right">{fmt(row.original)}</TableCell>
+                  <TableCell className="text-right">{fmt(row.optimized)}</TableCell>
+                  <TableCell className="text-right">{fmt(row.optimized - row.original)}</TableCell>
+                  <TableCell className="text-right">
+                    <span className={`inline-flex items-center gap-1 text-xs font-medium ${row.change > 0 ? "text-green-600" : row.change < 0 ? "text-red-600" : "text-muted-foreground"}`}>
+                      {row.change > 0 ? <ArrowUpRight className="h-3 w-3" /> : row.change < 0 ? <ArrowDownRight className="h-3 w-3" /> : null}
+                      {row.change > 0 ? "+" : ""}{row.change.toFixed(1)}%
+                    </span>
+                  </TableCell>
+                </TableRow>
+              ))}
+              <TableRow className="font-bold border-t-2">
+                <TableCell>Total</TableCell>
+                <TableCell className="text-right">{fmt(totalOriginal)}</TableCell>
+                <TableCell className="text-right">{fmt(totalOptimized)}</TableCell>
+                <TableCell className="text-right">{fmt(totalOptimized - totalOriginal)}</TableCell>
+                <TableCell className="text-right">—</TableCell>
+              </TableRow>
+            </TableBody>
+          </Table>
+        </div>
       </div>
     );
   }
 
   function renderBudgetResults() {
     if (!budgetResult) return null;
-    const r = budgetResult as Record<string, Record<string, number> | number>;
+    const r = budgetResult as Record<string, unknown>;
     const baseline = r.baseline_per_week as Record<string, number> || {};
     const optimal = r.optimal_per_week as Record<string, number> || {};
-    const chartData = Object.keys(optimal).map((ch) => ({
+    const optimalTotal = r.optimal_total as Record<string, number> || {};
+    const changePct = r.change_pct as Record<string, number> || {};
+    const expectedResp = r.expected_response as Record<string, number> | number;
+    const expectedRoas = r.expected_roas as number;
+
+    const respMean = typeof expectedResp === "object" ? (expectedResp as Record<string, number>).mean : (expectedResp as number);
+    const respCi5 = typeof expectedResp === "object" ? (expectedResp as Record<string, number>).ci_5 : undefined;
+    const respCi95 = typeof expectedResp === "object" ? (expectedResp as Record<string, number>).ci_95 : undefined;
+
+    const channels = Object.keys(optimal);
+    const totalBaseline = Object.values(baseline).reduce((s, v) => s + v, 0);
+    const totalOptimal = Object.values(optimal).reduce((s, v) => s + v, 0);
+
+    const chartData = channels.map((ch) => ({
       channel: ch.replace("spend_", ""),
       baseline: Math.round(baseline[ch] || 0),
       optimal: Math.round(optimal[ch]),
-    }));
+      change: changePct[ch] || 0,
+      total: Math.round(optimalTotal[ch] || 0),
+    })).sort((a, b) => b.change - a.change);
 
     return (
-      <div className="space-y-4 mt-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Card className="p-3">
-              <div className="text-xs text-muted-foreground">Expected Response</div>
-              <div className="text-xl font-bold text-green-600">
-                {Number(r.expected_response).toLocaleString()}
-              </div>
-            </Card>
-            <Card className="p-3">
-              <div className="text-xs text-muted-foreground">Expected ROAS</div>
-              <div className="text-xl font-bold">
-                {Number(r.expected_roas).toFixed(2)}
-              </div>
-            </Card>
-          </div>
+      <div className="space-y-6 mt-6">
+        {/* KPI cards */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-xs font-medium text-muted-foreground">Expected Response</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-green-600">{fmt(respMean || 0)}</div>
+              {respCi5 != null && respCi95 != null && (
+                <p className="text-xs text-muted-foreground">CI: {fmt(respCi5)} — {fmt(respCi95)}</p>
+              )}
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-xs font-medium text-muted-foreground">Expected ROAS</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{Number(expectedRoas || 0).toFixed(2)}x</div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-xs font-medium text-muted-foreground">Weekly Budget</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{fmt(totalOptimal)}</div>
+              <p className="text-xs text-muted-foreground">per week</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-xs font-medium text-muted-foreground">Channels</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{channels.length}</div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Save button */}
+        <div className="flex items-center justify-end">
           <Button
             variant="outline"
             size="sm"
@@ -292,17 +428,63 @@ export default function OptimizationPage() {
             Save Scenario
           </Button>
         </div>
+
+        {/* Chart */}
         <ResponsiveContainer width="100%" height={350}>
           <BarChart data={chartData}>
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis dataKey="channel" tick={{ fontSize: 12 }} />
-            <YAxis tick={{ fontSize: 12 }} />
-            <Tooltip />
+            <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => fmt(v)} />
+            <Tooltip formatter={(value: number) => [fmt(value), ""]} contentStyle={{ borderRadius: "8px", border: "1px solid #e2e8f0" }} />
             <Legend />
-            <Bar dataKey="baseline" fill="#94a3b8" name="Baseline/week" />
-            <Bar dataKey="optimal" fill="#6366f1" name="Optimal/week" />
+            <Bar dataKey="baseline" fill="#94a3b8" name="Baseline/week" radius={[4, 4, 0, 0]} />
+            <Bar dataKey="optimal" fill="#6366f1" name="Optimal/week" radius={[4, 4, 0, 0]} />
           </BarChart>
         </ResponsiveContainer>
+
+        {/* Allocation table */}
+        <div className="rounded-md border overflow-auto">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Channel</TableHead>
+                <TableHead className="text-right">Baseline/wk</TableHead>
+                <TableHead className="text-right">Optimal/wk</TableHead>
+                <TableHead className="text-right">Total ({bNumWeeks}wk)</TableHead>
+                <TableHead className="text-right">Change</TableHead>
+                <TableHead className="text-right">Direction</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {chartData.map((row) => (
+                <TableRow key={row.channel}>
+                  <TableCell className="font-medium">{row.channel}</TableCell>
+                  <TableCell className="text-right">{fmt(row.baseline)}</TableCell>
+                  <TableCell className="text-right">{fmt(row.optimal)}</TableCell>
+                  <TableCell className="text-right">{fmt(row.total)}</TableCell>
+                  <TableCell className="text-right">
+                    <span className={`text-xs font-medium ${row.change > 0 ? "text-green-600" : row.change < 0 ? "text-red-600" : "text-muted-foreground"}`}>
+                      {row.change > 0 ? "+" : ""}{row.change.toFixed(1)}%
+                    </span>
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <span className={`inline-flex items-center gap-1 text-xs ${row.change > 5 ? "text-green-600" : row.change < -5 ? "text-red-600" : "text-muted-foreground"}`}>
+                      {row.change > 5 ? <><ArrowUpRight className="h-3 w-3" />Increase</> : row.change < -5 ? <><ArrowDownRight className="h-3 w-3" />Decrease</> : "Maintain"}
+                    </span>
+                  </TableCell>
+                </TableRow>
+              ))}
+              <TableRow className="font-bold border-t-2">
+                <TableCell>Total</TableCell>
+                <TableCell className="text-right">{fmt(totalBaseline)}</TableCell>
+                <TableCell className="text-right">{fmt(totalOptimal)}</TableCell>
+                <TableCell className="text-right">{fmt(totalOptimal * bNumWeeks)}</TableCell>
+                <TableCell className="text-right">—</TableCell>
+                <TableCell className="text-right">—</TableCell>
+              </TableRow>
+            </TableBody>
+          </Table>
+        </div>
       </div>
     );
   }
@@ -492,31 +674,135 @@ export default function OptimizationPage() {
                   {compareMut.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                   Compare Periods
                 </Button>
-                {compareResult && (
-                  <div className="mt-4 rounded-lg border p-4">
-                    <div className="flex items-center justify-between mb-3">
-                      <h4 className="font-medium">Comparison Results</h4>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() =>
-                          saveMut.mutate({
-                            name: `Compare ${cP1Start} vs ${cP2Start}`,
-                            type: "comparison",
-                            input_params: { period1_start: cP1Start, period1_end: cP1End, period2_start: cP2Start, period2_end: cP2End },
-                            results: compareResult,
-                          })
-                        }
-                      >
-                        <Save className="mr-2 h-4 w-4" />
-                        Save
-                      </Button>
+                {compareResult && (() => {
+                  const cr = compareResult as Record<string, unknown>;
+                  const p1Spend = cr.period1_spend as Record<string, number> || {};
+                  const p2Spend = cr.period2_spend as Record<string, number> || {};
+                  const p1Resp = cr.period1_response as number;
+                  const p2Resp = cr.period2_response as number;
+                  const channels = Object.keys(p1Spend);
+                  const compChartData = channels.map((ch) => ({
+                    channel: ch.replace("spend_", ""),
+                    period1: Math.round(p1Spend[ch] || 0),
+                    period2: Math.round(p2Spend[ch] || 0),
+                  }));
+                  const totalP1 = Object.values(p1Spend).reduce((s, v) => s + v, 0);
+                  const totalP2 = Object.values(p2Spend).reduce((s, v) => s + v, 0);
+                  const spendChange = totalP1 > 0 ? ((totalP2 - totalP1) / totalP1 * 100) : 0;
+                  const respChange = p1Resp > 0 ? ((p2Resp - p1Resp) / p1Resp * 100) : 0;
+
+                  return (
+                    <div className="space-y-6 mt-6">
+                      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                        <Card>
+                          <CardHeader className="pb-2">
+                            <CardTitle className="text-xs font-medium text-muted-foreground">P1 Total Spend</CardTitle>
+                          </CardHeader>
+                          <CardContent>
+                            <div className="text-2xl font-bold">{fmt(totalP1)}</div>
+                            <p className="text-xs text-muted-foreground">{cP1Start} — {cP1End}</p>
+                          </CardContent>
+                        </Card>
+                        <Card>
+                          <CardHeader className="pb-2">
+                            <CardTitle className="text-xs font-medium text-muted-foreground">P2 Total Spend</CardTitle>
+                          </CardHeader>
+                          <CardContent>
+                            <div className="text-2xl font-bold">{fmt(totalP2)}</div>
+                            <p className="text-xs text-muted-foreground">{cP2Start} — {cP2End}</p>
+                          </CardContent>
+                        </Card>
+                        <Card>
+                          <CardHeader className="pb-2">
+                            <CardTitle className="text-xs font-medium text-muted-foreground">Spend Change</CardTitle>
+                          </CardHeader>
+                          <CardContent>
+                            <div className={`text-2xl font-bold flex items-center gap-1 ${spendChange > 0 ? "text-amber-600" : "text-green-600"}`}>
+                              {spendChange > 0 ? <ArrowUpRight className="h-5 w-5" /> : <ArrowDownRight className="h-5 w-5" />}
+                              {spendChange > 0 ? "+" : ""}{spendChange.toFixed(1)}%
+                            </div>
+                          </CardContent>
+                        </Card>
+                        <Card>
+                          <CardHeader className="pb-2">
+                            <CardTitle className="text-xs font-medium text-muted-foreground">Response Change</CardTitle>
+                          </CardHeader>
+                          <CardContent>
+                            <div className={`text-2xl font-bold flex items-center gap-1 ${respChange > 0 ? "text-green-600" : "text-red-600"}`}>
+                              {respChange > 0 ? <ArrowUpRight className="h-5 w-5" /> : <ArrowDownRight className="h-5 w-5" />}
+                              {respChange > 0 ? "+" : ""}{respChange.toFixed(1)}%
+                            </div>
+                          </CardContent>
+                        </Card>
+                      </div>
+
+                      <div className="flex items-center justify-end">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() =>
+                            saveMut.mutate({
+                              name: `Compare ${cP1Start} vs ${cP2Start}`,
+                              type: "comparison",
+                              input_params: { period1_start: cP1Start, period1_end: cP1End, period2_start: cP2Start, period2_end: cP2End },
+                              results: compareResult,
+                            })
+                          }
+                        >
+                          <Save className="mr-2 h-4 w-4" />
+                          Save Scenario
+                        </Button>
+                      </div>
+
+                      {compChartData.length > 0 && (
+                        <ResponsiveContainer width="100%" height={350}>
+                          <BarChart data={compChartData}>
+                            <CartesianGrid strokeDasharray="3 3" />
+                            <XAxis dataKey="channel" tick={{ fontSize: 12 }} />
+                            <YAxis tick={{ fontSize: 11 }} tickFormatter={(v: number) => fmt(v)} />
+                            <Tooltip formatter={(value: number) => [fmt(value), ""]} contentStyle={{ borderRadius: "8px", border: "1px solid #e2e8f0" }} />
+                            <Legend />
+                            <Bar dataKey="period1" fill="#94a3b8" name={`P1 (${cP1Start})`} radius={[4, 4, 0, 0]} />
+                            <Bar dataKey="period2" fill="#6366f1" name={`P2 (${cP2Start})`} radius={[4, 4, 0, 0]} />
+                          </BarChart>
+                        </ResponsiveContainer>
+                      )}
+
+                      <div className="rounded-md border overflow-auto">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>Channel</TableHead>
+                              <TableHead className="text-right">Period 1</TableHead>
+                              <TableHead className="text-right">Period 2</TableHead>
+                              <TableHead className="text-right">Difference</TableHead>
+                              <TableHead className="text-right">Change</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {compChartData.map((row) => {
+                              const diff = row.period2 - row.period1;
+                              const pctChange = row.period1 > 0 ? (diff / row.period1 * 100) : 0;
+                              return (
+                                <TableRow key={row.channel}>
+                                  <TableCell className="font-medium">{row.channel}</TableCell>
+                                  <TableCell className="text-right">{fmt(row.period1)}</TableCell>
+                                  <TableCell className="text-right">{fmt(row.period2)}</TableCell>
+                                  <TableCell className="text-right">{fmt(diff)}</TableCell>
+                                  <TableCell className="text-right">
+                                    <span className={`inline-flex items-center gap-1 text-xs font-medium ${pctChange > 0 ? "text-green-600" : pctChange < 0 ? "text-red-600" : "text-muted-foreground"}`}>
+                                      {pctChange > 0 ? "+" : ""}{pctChange.toFixed(1)}%
+                                    </span>
+                                  </TableCell>
+                                </TableRow>
+                              );
+                            })}
+                          </TableBody>
+                        </Table>
+                      </div>
                     </div>
-                    <pre className="text-xs overflow-auto max-h-64 bg-muted p-3 rounded">
-                      {JSON.stringify(compareResult, null, 2)}
-                    </pre>
-                  </div>
-                )}
+                  );
+                })()}
               </CardContent>
             </Card>
           </TabsContent>

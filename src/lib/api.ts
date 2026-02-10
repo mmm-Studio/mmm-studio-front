@@ -142,17 +142,17 @@ export const projects = {
 // ============================================================================
 
 export const datasets = {
-  list: (orgId: string, projectId: string) =>
-    request<Dataset[]>(`/orgs/${orgId}/projects/${projectId}/datasets`),
-  get: (orgId: string, projectId: string, datasetId: string, previewRows = 10) =>
+  list: (orgId: string, projectId?: string) =>
+    request<Dataset[]>(`/orgs/${orgId}/datasets${projectId ? `?project_id=${projectId}` : ""}`),
+  get: (orgId: string, datasetId: string, previewRows = 10) =>
     request<DatasetDetail>(
-      `/orgs/${orgId}/projects/${projectId}/datasets/${datasetId}?preview_rows=${previewRows}`
+      `/orgs/${orgId}/datasets/${datasetId}?preview_rows=${previewRows}`
     ),
-  upload: (orgId: string, projectId: string, formData: FormData) =>
-    uploadFile<Dataset>(`/orgs/${orgId}/projects/${projectId}/datasets/upload`, formData),
-  delete: (orgId: string, projectId: string, datasetId: string) =>
+  upload: (orgId: string, formData: FormData) =>
+    uploadFile<Dataset>(`/orgs/${orgId}/datasets/upload`, formData),
+  delete: (orgId: string, datasetId: string) =>
     request<{ status: string }>(
-      `/orgs/${orgId}/projects/${projectId}/datasets/${datasetId}`,
+      `/orgs/${orgId}/datasets/${datasetId}`,
       { method: "DELETE" }
     ),
 };
@@ -167,7 +167,7 @@ export const jobs = {
   get: (orgId: string, jobId: string) =>
     request<Job>(`/orgs/${orgId}/jobs/${jobId}`),
   train: (orgId: string, projectId: string, data: TrainJobInput) =>
-    request<TrainJobResponse>(`/orgs/${orgId}/projects/${projectId}/jobs/train`, {
+    request<TrainJobResponse>(`/orgs/${orgId}/projects/${projectId}/train`, {
       method: "POST",
       body: data,
     }),
@@ -180,8 +180,8 @@ export const jobs = {
 // ============================================================================
 
 export const models = {
-  list: (orgId: string, projectId: string) =>
-    request<Model[]>(`/orgs/${orgId}/projects/${projectId}/models`),
+  list: (orgId: string, projectId?: string) =>
+    request<Model[]>(`/orgs/${orgId}/models${projectId ? `?project_id=${projectId}` : ""}`),
   get: (orgId: string, modelId: string) =>
     request<ModelDetail>(`/orgs/${orgId}/models/${modelId}`),
   delete: (orgId: string, modelId: string) =>
@@ -197,6 +197,10 @@ export const analysis = {
     request<RoasResult>(`/orgs/${orgId}/models/${modelId}/roas`),
   contributions: (orgId: string, modelId: string) =>
     request<ContributionsResult>(`/orgs/${orgId}/models/${modelId}/contributions`),
+  contributionsTimeseries: (orgId: string, modelId: string) =>
+    request<ContributionsTimeseriesResult>(`/orgs/${orgId}/models/${modelId}/contributions/timeseries`),
+  spendVsContribution: (orgId: string, modelId: string) =>
+    request<SpendVsContributionResult>(`/orgs/${orgId}/models/${modelId}/spend-vs-contribution`),
   posterior: (orgId: string, modelId: string) =>
     request<PosteriorResult>(`/orgs/${orgId}/models/${modelId}/posterior`),
 };
@@ -379,6 +383,27 @@ export interface ContributionsResult {
   contribution_by_channel: Record<string, number>;
   contribution_percentage: Record<string, number>;
   total_contribution: number;
+}
+
+export interface ContributionsTimeseriesResult {
+  model_id: string;
+  dates: string[];
+  channels: string[];
+  series: Record<string, number[]>;
+  target: number[];
+}
+
+export interface SpendVsContributionResult {
+  model_id: string;
+  channels: {
+    channel: string;
+    label: string;
+    total_spend: number;
+    total_contribution: number;
+    roas: number;
+    spend_share: number;
+    contribution_share: number;
+  }[];
 }
 
 export interface PosteriorResult {
