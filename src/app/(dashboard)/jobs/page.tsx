@@ -117,6 +117,7 @@ export default function JobsPage() {
       const hasActive = data?.some((j) => j.status === "queued" || j.status === "running");
       return hasActive ? 5000 : false;
     },
+    refetchIntervalInBackground: true,
   });
 
   const trainMutation = useMutation({
