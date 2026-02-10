@@ -142,7 +142,11 @@ export default function JobsPage() {
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["jobs"] });
-      toast.success(`Training job started: ${data.job_id.slice(0, 8)}`);
+      const d = data as unknown as Record<string, unknown>;
+      const jobId = (d.job_id as string)
+        || ((d.job as Record<string, unknown>)?.id as string)
+        || "";
+      toast.success(`Training job started: ${jobId.slice(0, 8)}`);
       setOpen(false);
       setModelName("");
     },
