@@ -279,7 +279,7 @@ export default function ModelDetailPage() {
                         <XAxis dataKey="label" tick={{ fontSize: 12 }} />
                         <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => fmt(v)} />
                         <Tooltip
-                          formatter={(value: number) => [fmt(value), ""]}
+                          formatter={(value) => [fmt(Number(value)), ""]}
                           contentStyle={{ borderRadius: "8px", border: "1px solid #e2e8f0" }}
                         />
                         <Legend />
@@ -463,7 +463,7 @@ export default function ModelDetailPage() {
                       <XAxis dataKey="date" tick={{ fontSize: 10 }} interval="preserveStartEnd" />
                       <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => fmt(v)} />
                       <Tooltip
-                        formatter={(value: number) => [fmt(value), ""]}
+                        formatter={(value) => [fmt(Number(value)), ""]}
                         contentStyle={{ borderRadius: "8px", border: "1px solid #e2e8f0" }}
                       />
                       <Legend />
@@ -508,7 +508,7 @@ export default function ModelDetailPage() {
                       <XAxis dataKey="date" tick={{ fontSize: 10 }} interval="preserveStartEnd" />
                       <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => fmt(v)} />
                       <Tooltip
-                        formatter={(value: number) => [fmt(value), ""]}
+                        formatter={(value) => [fmt(Number(value)), ""]}
                         contentStyle={{ borderRadius: "8px", border: "1px solid #e2e8f0" }}
                       />
                       <Legend />
