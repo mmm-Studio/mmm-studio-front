@@ -293,8 +293,8 @@ else:
     print(f'  \033[0;32m✓\033[0m Spend shares sum to {spend_sum:.1f}%, contribution shares sum to {contrib_sum:.1f}%')
     over = [c for c in channels if c['contribution_share'] > c['spend_share']]
     under = [c for c in channels if c['contribution_share'] < c['spend_share']]
-    if over: print(f'  \033[0;32m✓\033[0m Over-performers: {[c["channel"] for c in over]}')
-    if under: print(f'  \033[0;32m✓\033[0m Under-performers: {[c["channel"] for c in under]}')
+    if over: print('  \033[0;32m✓\033[0m Over-performers: ' + str([c.get('channel') for c in over]))
+    if under: print('  \033[0;32m✓\033[0m Under-performers: ' + str([c.get('channel') for c in under]))
 " <<< "$SVC"
 
   # --- 3e. POSTERIOR ---
@@ -449,13 +449,17 @@ if not p2: errors.append('period2 is empty')
 # Check the nested structure the frontend expects
 p1_spend = p1.get('spend_by_channel', {})
 p2_spend = p2.get('spend_by_channel', {})
-p1_resp = p1.get('total_response', 0)
-p2_resp = p2.get('total_response', 0)
+p1_sales = p1.get('total_sales', 0)
+p2_sales = p2.get('total_sales', 0)
+p1_contrib = p1.get('total_contribution', 0)
+p2_contrib = p2.get('total_contribution', 0)
 
-if not p1_spend and not d.get('period1_spend'):
+if not p1_spend:
     errors.append('period1 has no spend_by_channel')
-if p1_resp <= 0 and not d.get('period1_response'):
-    errors.append(f'period1 total_response invalid: {p1_resp}')
+if p1_sales <= 0:
+    errors.append(f'period1 total_sales invalid: {p1_sales}')
+if p1_contrib == p2_contrib and p1_contrib > 0:
+    errors.append(f'period contributions identical ({p1_contrib:.0f}) — likely not filtered by date')
 
 if errors:
     for e in errors: print(f'  \033[0;31m✗\033[0m Compare: {e}')
@@ -463,11 +467,11 @@ else:
     p1t = sum(p1_spend.values()) if p1_spend else 0
     p2t = sum(p2_spend.values()) if p2_spend else 0
     print(f'  \033[0;32m✓\033[0m Compare: {len(p1_spend)} channels in each period')
-    print(f'  \033[0;32m✓\033[0m P1 spend: \${p1t:,.0f}, response: {p1_resp:,.0f}')
-    print(f'  \033[0;32m✓\033[0m P2 spend: \${p2t:,.0f}, response: {p2_resp:,.0f}')
-    if p1_resp > 0:
-        change = (p2_resp - p1_resp) / p1_resp * 100
-        print(f'  \033[0;32m✓\033[0m Response change: {change:+.1f}%')
+    print(f'  \033[0;32m✓\033[0m P1: sales={p1_sales:,.0f}, spend=\${p1t:,.0f}, contrib={p1_contrib:,.0f}')
+    print(f'  \033[0;32m✓\033[0m P2: sales={p2_sales:,.0f}, spend=\${p2t:,.0f}, contrib={p2_contrib:,.0f}')
+    if p1_sales > 0:
+        change = (p2_sales - p1_sales) / p1_sales * 100
+        print(f'  \033[0;32m✓\033[0m Sales change: {change:+.1f}%')
 " <<< "$COMPARE"
 
   # =============================================================================
