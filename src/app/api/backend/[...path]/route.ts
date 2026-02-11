@@ -12,7 +12,10 @@ async function proxyRequest(req: NextRequest) {
   const auth = req.headers.get("authorization");
   if (auth) headers["Authorization"] = auth;
   const ct = req.headers.get("content-type");
-  if (ct) headers["Content-Type"] = ct;
+  // Only forward Content-Type for non-multipart requests;
+  // for multipart, let fetch set it with the correct boundary
+  const isMultipart = ct?.includes("multipart/form-data");
+  if (ct && !isMultipart) headers["Content-Type"] = ct;
 
   const fetchOptions: RequestInit = {
     method: req.method,
@@ -20,8 +23,16 @@ async function proxyRequest(req: NextRequest) {
   };
 
   if (req.method !== "GET" && req.method !== "HEAD") {
-    const body = await req.text();
-    if (body) fetchOptions.body = body;
+    if (isMultipart) {
+      // Stream binary body as-is to preserve file data
+      fetchOptions.body = await req.arrayBuffer();
+      // Re-set Content-Type with original boundary for multipart
+      if (ct) headers["Content-Type"] = ct;
+      fetchOptions.headers = headers;
+    } else {
+      const body = await req.text();
+      if (body) fetchOptions.body = body;
+    }
   }
 
   try {
