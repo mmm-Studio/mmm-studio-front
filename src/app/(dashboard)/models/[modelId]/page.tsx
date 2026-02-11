@@ -218,7 +218,7 @@ export default function ModelDetailPage() {
     ? Object.entries(contribData.contribution_percentage)
         .map(([channel, pct]) => ({
           name: channel.replace("spend_", ""),
-          value: Number((Number(pct) * 100).toFixed(1)),
+          value: Number(Number(pct).toFixed(1)),
         }))
         .sort((a, b) => b.value - a.value)
     : [];
