@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAuthStore } from "@/stores/auth-store";
@@ -195,9 +195,11 @@ export default function OptimizationPage() {
     enabled: !!currentOrgId && !!selectedProject,
   });
 
-  if (projectList?.length && !selectedProject) {
-    setSelectedProject(projectList[0].id);
-  }
+  useEffect(() => {
+    if (projectList?.length && !selectedProject) {
+      setSelectedProject(projectList[0].id);
+    }
+  }, [projectList, selectedProject]);
 
   const readyModels = modelList?.filter((m) => m.status === "ready") || [];
 
@@ -207,16 +209,17 @@ export default function OptimizationPage() {
   const modelEndDate = currentModel?.end_date || "";
 
   // Auto-fill dates when model is selected and dates are empty
-  if (currentModel && !hStartDate && modelStartDate) {
-    setHStartDate(modelStartDate);
-  }
-  if (currentModel && !hEndDate && modelEndDate) {
-    // Use a date ~2 months before end as default end for historical opt
-    const endD = new Date(modelEndDate);
-    const testWeeks = currentModel?.config?.test_weeks || 8;
-    endD.setDate(endD.getDate() - testWeeks * 7);
-    setHEndDate(endD.toISOString().split("T")[0]);
-  }
+  useEffect(() => {
+    if (currentModel && !hStartDate && modelStartDate) {
+      setHStartDate(modelStartDate);
+    }
+    if (currentModel && !hEndDate && modelEndDate) {
+      const endD = new Date(modelEndDate);
+      const testWeeks = currentModel?.config?.test_weeks || 8;
+      endD.setDate(endD.getDate() - testWeeks * 7);
+      setHEndDate(endD.toISOString().split("T")[0]);
+    }
+  }, [currentModel, hStartDate, hEndDate, modelStartDate, modelEndDate]);
 
   const historicalMut = useMutation({
     mutationFn: () => {

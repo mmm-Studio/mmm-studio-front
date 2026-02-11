@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuthStore } from "@/stores/auth-store";
 import { createClient } from "@/lib/supabase/client";
@@ -103,9 +103,11 @@ export default function ResultsPage() {
     onError: (err: Error) => toast.error(err.message),
   });
 
-  if (projectList?.length && !selectedProject) {
-    setSelectedProject(projectList[0].id);
-  }
+  useEffect(() => {
+    if (projectList?.length && !selectedProject) {
+      setSelectedProject(projectList[0].id);
+    }
+  }, [projectList, selectedProject]);
 
   const readyModels = modelList?.filter((m) => m.status === "ready") || [];
 
