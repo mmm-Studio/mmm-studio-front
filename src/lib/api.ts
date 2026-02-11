@@ -56,8 +56,10 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
   });
 
   if (!res.ok) {
-    const error = await res.json().catch(() => ({ detail: res.statusText }));
-    throw new ApiError(res.status, error.detail || res.statusText);
+    const errorBody = await res.json().catch(() => ({ detail: res.statusText }));
+    const detail = errorBody.detail || res.statusText;
+    console.error(`[API ${res.status}] ${method} ${path}:`, detail);
+    throw new ApiError(res.status, detail);
   }
 
   return res.json();
