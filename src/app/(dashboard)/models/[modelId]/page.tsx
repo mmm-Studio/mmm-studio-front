@@ -434,7 +434,7 @@ export default function ModelDetailPage() {
                 ) : (
                   <div className="space-y-6">
                     <ResponsiveContainer width="100%" height={350}>
-                      <BarChart data={efficiencyData.channels.sort((a, b) => b.roas - a.roas)} margin={{ left: 20 }}>
+                      <BarChart data={[...efficiencyData.channels].sort((a, b) => b.roas - a.roas)} margin={{ left: 20 }}>
                         <CartesianGrid strokeDasharray="3 3" />
                         <XAxis dataKey="label" tick={{ fontSize: 12 }} />
                         <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => fmt(v)} />
@@ -456,7 +456,7 @@ export default function ModelDetailPage() {
                       </CardHeader>
                       <CardContent>
                         <div className="space-y-3">
-                          {efficiencyData.channels.sort((a, b) => (b.contribution_share - b.spend_share) - (a.contribution_share - a.spend_share)).map((ch, i) => {
+                          {[...efficiencyData.channels].sort((a, b) => (b.contribution_share - b.spend_share) - (a.contribution_share - a.spend_share)).map((ch, i) => {
                             const delta = ch.contribution_share - ch.spend_share;
                             return (
                               <div key={ch.channel} className="space-y-1">
@@ -500,7 +500,7 @@ export default function ModelDetailPage() {
                           </TableRow>
                         </TableHeader>
                         <TableBody>
-                          {efficiencyData.channels
+                          {[...efficiencyData.channels]
                             .sort((a, b) => b.roas - a.roas)
                             .map((ch) => {
                               const isEfficient = ch.contribution_share > ch.spend_share;
