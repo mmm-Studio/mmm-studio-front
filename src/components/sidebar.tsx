@@ -7,14 +7,13 @@ import { useAuthStore } from "@/stores/auth-store";
 import {
   BarChart3,
   Database,
-  FolderKanban,
-  Cpu,
-  LineChart,
   Settings,
   LogOut,
   ChevronDown,
   TrendingUp,
   LayoutDashboard,
+  FileText,
+  Building2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -26,13 +25,36 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 const navItems = [
-  { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-  { label: "Projects", href: "/projects", icon: FolderKanban },
-  { label: "Datasets", href: "/datasets", icon: Database },
-  { label: "Training Jobs", href: "/jobs", icon: Cpu },
-  { label: "Models", href: "/models", icon: BarChart3 },
-  { label: "Optimization", href: "/optimization", icon: TrendingUp },
-  { label: "Results", href: "/results", icon: LineChart },
+  {
+    label: "Resumen",
+    description: "Vista general de tu inversion",
+    href: "/dashboard",
+    icon: LayoutDashboard,
+  },
+  {
+    label: "Mis Datos",
+    description: "Datos de inversion y ventas",
+    href: "/datasets",
+    icon: Database,
+  },
+  {
+    label: "Analisis",
+    description: "Rendimiento de tus canales",
+    href: "/models",
+    icon: BarChart3,
+  },
+  {
+    label: "Presupuesto",
+    description: "Planifica y optimiza",
+    href: "/optimization",
+    icon: TrendingUp,
+  },
+  {
+    label: "Escenarios",
+    description: "Simulaciones guardadas",
+    href: "/results",
+    icon: FileText,
+  },
 ];
 
 export function Sidebar() {
@@ -43,19 +65,34 @@ export function Sidebar() {
 
   return (
     <aside className="flex h-screen w-64 flex-col border-r bg-card">
-      <div className="flex h-14 items-center gap-2 border-b px-4">
+      {/* Brand */}
+      <div className="flex h-14 items-center gap-2.5 border-b px-4">
         <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
           <BarChart3 className="h-4 w-4" />
         </div>
-        <span className="font-semibold text-lg">MMM Studio</span>
+        <div className="flex flex-col">
+          <span className="font-semibold text-sm leading-none">MMM Studio</span>
+          <span className="text-[10px] text-muted-foreground leading-tight mt-0.5">
+            Marketing Mix Modeling
+          </span>
+        </div>
       </div>
 
+      {/* Org switcher */}
       <div className="border-b p-3">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="outline" className="w-full justify-between text-left font-normal">
-              <span className="truncate">{currentOrg?.name || "Select org"}</span>
-              <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+            <Button
+              variant="outline"
+              className="w-full justify-between text-left font-normal h-9"
+            >
+              <span className="flex items-center gap-2 truncate">
+                <Building2 className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                <span className="truncate text-sm">
+                  {currentOrg?.name || "Seleccionar organizacion"}
+                </span>
+              </span>
+              <ChevronDown className="ml-2 h-3.5 w-3.5 shrink-0 opacity-50" />
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent className="w-56" align="start">
@@ -71,34 +108,63 @@ export function Sidebar() {
             ))}
             <DropdownMenuSeparator />
             <DropdownMenuItem asChild>
-              <Link href="/orgs/new">+ Create Organization</Link>
+              <Link href="/orgs/new">+ Nueva organizacion</Link>
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
 
-      <nav className="flex-1 overflow-y-auto p-3 space-y-1">
+      {/* Navigation */}
+      <nav className="flex-1 overflow-y-auto p-3 space-y-0.5">
         {navItems.map((item) => {
-          const isActive = pathname.startsWith(item.href);
+          const isActive =
+            item.href === "/models"
+              ? pathname.startsWith("/models")
+              : item.href === "/dashboard"
+                ? pathname === "/dashboard" || pathname === "/"
+                : pathname.startsWith(item.href);
           return (
             <Link
               key={item.href}
               href={item.href}
               className={cn(
-                "flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors",
+                "flex items-center gap-3 rounded-lg px-3 py-2.5 transition-all group",
                 isActive
-                  ? "bg-primary/10 text-primary font-medium"
+                  ? "bg-primary/10 text-primary"
                   : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
               )}
             >
-              <item.icon className="h-4 w-4" />
-              {item.label}
+              <item.icon
+                className={cn(
+                  "h-[18px] w-[18px] shrink-0 transition-colors",
+                  isActive ? "text-primary" : "text-muted-foreground/70 group-hover:text-accent-foreground"
+                )}
+              />
+              <div className="flex flex-col min-w-0">
+                <span
+                  className={cn(
+                    "text-sm leading-none",
+                    isActive ? "font-semibold" : "font-medium"
+                  )}
+                >
+                  {item.label}
+                </span>
+                <span
+                  className={cn(
+                    "text-[11px] leading-tight mt-0.5 truncate",
+                    isActive ? "text-primary/70" : "text-muted-foreground/60"
+                  )}
+                >
+                  {item.description}
+                </span>
+              </div>
             </Link>
           );
         })}
       </nav>
 
-      <div className="border-t p-3 space-y-1">
+      {/* Footer */}
+      <div className="border-t p-3 space-y-0.5">
         <Link
           href="/settings"
           className={cn(
@@ -109,16 +175,16 @@ export function Sidebar() {
           )}
         >
           <Settings className="h-4 w-4" />
-          Settings
+          Configuracion
         </Link>
         <button
           onClick={signOut}
           className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
         >
           <LogOut className="h-4 w-4" />
-          Sign Out
+          Cerrar sesion
         </button>
-        <div className="px-3 pt-2 text-xs text-muted-foreground truncate">
+        <div className="px-3 pt-2 text-[11px] text-muted-foreground/60 truncate">
           {user?.email}
         </div>
       </div>

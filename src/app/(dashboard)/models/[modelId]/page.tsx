@@ -19,23 +19,23 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { SectionHeader, MetricCard, InfoTooltip, ChannelHealthCard } from "@/components/marketing";
 import Link from "next/link";
 import {
   BarChart3,
   Calendar,
-  HardDrive,
   TrendingUp,
   ArrowLeft,
   ArrowUpRight,
   ArrowDownRight,
   DollarSign,
   Target,
-  Zap,
-  Info,
   Award,
   AlertTriangle,
   TrendingDown,
-  Layers,
+  Lightbulb,
+  Clock,
+  Sparkles,
 } from "lucide-react";
 import {
   BarChart,
@@ -76,50 +76,30 @@ function fmt(n: number): string {
   return n.toFixed(1);
 }
 
-function pct(n: number): string {
-  return `${(n * 100).toFixed(1)}%`;
+function fmtEur(n: number): string {
+  return `${fmt(n)} EUR`;
 }
 
-function KpiCard({ title, value, subtitle, icon: Icon, trend, trendLabel, className = "" }: {
-  title: string;
-  value: string;
-  subtitle?: string;
-  icon: React.ComponentType<{ className?: string }>;
-  trend?: "up" | "down" | "neutral";
-  trendLabel?: string;
-  className?: string;
+function cleanCh(name: string): string {
+  return name.replace(/^spend_/i, "").replace(/_/g, " ");
+}
+
+function InsightBanner({ type, icon: Icon, children }: {
+  type: "info" | "success" | "warning" | "opportunity";
+  icon?: React.ComponentType<{ className?: string }>;
+  children: React.ReactNode;
 }) {
-  return (
-    <Card className={className}>
-      <CardHeader className="flex flex-row items-center justify-between pb-2">
-        <CardTitle className="text-xs font-medium text-muted-foreground">{title}</CardTitle>
-        <Icon className="h-4 w-4 text-muted-foreground" />
-      </CardHeader>
-      <CardContent>
-        <div className="text-2xl font-bold">{value}</div>
-        {subtitle && <p className="text-xs text-muted-foreground mt-1">{subtitle}</p>}
-        {trendLabel && (
-          <p className={`text-xs mt-1 flex items-center gap-1 ${trend === "up" ? "text-green-600" : trend === "down" ? "text-red-500" : "text-muted-foreground"}`}>
-            {trend === "up" ? <ArrowUpRight className="h-3 w-3" /> : trend === "down" ? <ArrowDownRight className="h-3 w-3" /> : null}
-            {trendLabel}
-          </p>
-        )}
-      </CardContent>
-    </Card>
-  );
-}
-
-function InsightBanner({ type, children }: { type: "info" | "success" | "warning"; children: React.ReactNode }) {
   const styles = {
-    info: "bg-blue-50 border-blue-200 text-blue-800 dark:bg-blue-950 dark:border-blue-800 dark:text-blue-200",
-    success: "bg-green-50 border-green-200 text-green-800 dark:bg-green-950 dark:border-green-800 dark:text-green-200",
-    warning: "bg-amber-50 border-amber-200 text-amber-800 dark:bg-amber-950 dark:border-amber-800 dark:text-amber-200",
+    info: "bg-blue-50 border-blue-200 text-blue-800 dark:bg-blue-950/30 dark:border-blue-800 dark:text-blue-200",
+    success: "bg-emerald-50 border-emerald-200 text-emerald-800 dark:bg-emerald-950/30 dark:border-emerald-800 dark:text-emerald-200",
+    warning: "bg-amber-50 border-amber-200 text-amber-800 dark:bg-amber-950/30 dark:border-amber-800 dark:text-amber-200",
+    opportunity: "bg-primary/5 border-primary/20 text-foreground",
   };
-  const icons = { info: Info, success: Award, warning: AlertTriangle };
-  const Icon = icons[type];
+  const defaultIcons = { info: Lightbulb, success: Award, warning: AlertTriangle, opportunity: Sparkles };
+  const IconComp = Icon || defaultIcons[type];
   return (
-    <div className={`flex items-start gap-3 p-4 rounded-lg border ${styles[type]}`}>
-      <Icon className="h-4 w-4 mt-0.5 shrink-0" />
+    <div className={`flex items-start gap-3 p-4 rounded-xl border ${styles[type]}`}>
+      <IconComp className="h-4 w-4 mt-0.5 shrink-0" />
       <div className="text-sm leading-relaxed">{children}</div>
     </div>
   );
@@ -257,8 +237,8 @@ export default function ModelDetailPage() {
     return (
       <div className="space-y-6">
         <Skeleton className="h-10 w-64" />
-        <div className="grid gap-4 sm:grid-cols-3">
-          {[...Array(3)].map((_, i) => <Skeleton key={i} className="h-32" />)}
+        <div className="grid gap-4 sm:grid-cols-4">
+          {[...Array(4)].map((_, i) => <Skeleton key={i} className="h-32" />)}
         </div>
         <Skeleton className="h-96" />
       </div>
@@ -266,114 +246,99 @@ export default function ModelDetailPage() {
   }
 
   if (!model) {
-    return <p className="text-muted-foreground">Model not found.</p>;
+    return <p className="text-muted-foreground">Analisis no encontrado.</p>;
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       {/* Header */}
-      <div className="flex items-center gap-4">
-        <Button variant="ghost" size="icon" asChild>
+      <div className="flex items-start gap-4">
+        <Button variant="ghost" size="icon" asChild className="mt-1">
           <Link href="/models"><ArrowLeft className="h-4 w-4" /></Link>
         </Button>
-        <div className="flex-1">
-          <div className="flex items-center gap-3">
-            <h1 className="text-3xl font-bold tracking-tight">{model.name}</h1>
-            <Badge
-              variant={isReady ? "outline" : "secondary"}
-              className={isReady ? "border-green-200 text-green-700" : ""}
-            >
-              {model.status}
-            </Badge>
-          </div>
-          <div className="flex items-center gap-4 mt-1 text-sm text-muted-foreground">
+        <div className="flex-1 min-w-0">
+          <SectionHeader
+            icon={BarChart3}
+            title={model.name}
+            description="Analisis detallado del rendimiento de cada canal de inversion. Descubre que canales generan mas ventas por euro invertido."
+          >
+            <Button asChild className="gap-2">
+              <Link href={`/optimization?model=${modelId}`}>
+                <TrendingUp className="h-4 w-4" />
+                Optimizar presupuesto
+              </Link>
+            </Button>
+          </SectionHeader>
+          <div className="flex items-center gap-3 mt-3 ml-[52px]">
             {model.start_date && model.end_date && (
-              <span className="flex items-center gap-1">
-                <Calendar className="h-3.5 w-3.5" />
-                {model.start_date} — {model.end_date}
+              <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <Calendar className="h-3 w-3" />
+                {new Date(model.start_date).toLocaleDateString("es-ES", { month: "short", year: "numeric" })}
+                {" — "}
+                {new Date(model.end_date).toLocaleDateString("es-ES", { month: "short", year: "numeric" })}
               </span>
             )}
-            {model.file_size_mb && (
-              <span className="flex items-center gap-1">
-                <HardDrive className="h-3.5 w-3.5" />
-                {model.file_size_mb.toFixed(1)}MB
-              </span>
-            )}
-            {model.config && (
-              <span className="flex items-center gap-1">
-                <Layers className="h-3.5 w-3.5" />
-                {String((model.config as Record<string, unknown>).draws ?? "?")} draws / {String((model.config as Record<string, unknown>).chains ?? "?")} chains
-              </span>
+            {model.spend_columns && (
+              <div className="flex flex-wrap gap-1.5">
+                {model.spend_columns.map((col: string) => (
+                  <span
+                    key={col}
+                    className="inline-flex items-center rounded-md bg-primary/8 px-2 py-0.5 text-[11px] font-medium text-primary"
+                  >
+                    {col.replace("spend_", "")}
+                  </span>
+                ))}
+              </div>
             )}
           </div>
         </div>
-        <Button asChild>
-          <Link href={`/optimization?model=${modelId}`}>
-            <TrendingUp className="mr-2 h-4 w-4" />
-            Optimize
-          </Link>
-        </Button>
       </div>
-
-      {/* Channels */}
-      {model.spend_columns && (
-        <div className="flex flex-wrap gap-1.5">
-          {model.spend_columns.map((col: string) => (
-            <Badge key={col} variant="secondary">
-              {col.replace("spend_", "")}
-            </Badge>
-          ))}
-        </div>
-      )}
 
       {/* Analysis Error Banner */}
       {isReady && analysisError && (
-        <div className="flex items-start gap-3 p-4 rounded-lg border bg-red-50 border-red-200 text-red-800 dark:bg-red-950 dark:border-red-800 dark:text-red-200">
+        <div className="flex items-start gap-3 p-4 rounded-xl border bg-red-50 border-red-200 text-red-800 dark:bg-red-950/30 dark:border-red-800 dark:text-red-200">
           <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
           <div className="text-sm">
-            <strong>Error loading analysis data:</strong>{" "}
-            {analysisError instanceof Error ? analysisError.message : "Unknown error. Check backend logs."}
+            <strong>Error al cargar datos de analisis:</strong>{" "}
+            {analysisError instanceof Error ? analysisError.message : "Error desconocido. Revisa los logs del backend."}
           </div>
         </div>
       )}
 
-      {/* Summary KPI cards - Enhanced */}
+      {/* Summary KPI cards */}
       {isReady && insights && (
         <>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
-            <KpiCard
-              title="Total Spend"
-              value={fmt(insights.totalSpend)}
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <MetricCard
               icon={DollarSign}
-              subtitle={`Across ${insights.channelCount} channels`}
+              label="Inversion total"
+              value={fmtEur(insights.totalSpend)}
+              tooltip="Suma de la inversion en todos los canales durante el periodo analizado"
+              subtitle={`${insights.channelCount} canales analizados`}
+              variant="default"
             />
-            <KpiCard
-              title="Total Contribution"
-              value={fmt(insights.totalContrib)}
+            <MetricCard
               icon={Target}
-              subtitle="Media-driven sales"
+              label="Ventas atribuidas"
+              value={fmtEur(insights.totalContrib)}
+              tooltip="Ventas que el modelo atribuye directamente a tu inversion en medios"
+              variant="success"
             />
-            <KpiCard
-              title="Average ROAS"
-              value={`${insights.avgRoas.toFixed(2)}x`}
+            <MetricCard
               icon={TrendingUp}
-              trend={insights.avgRoas >= 1 ? "up" : "down"}
-              trendLabel={insights.avgRoas >= 1 ? "Profitable" : "Below breakeven"}
+              label="Retorno medio (ROAS)"
+              value={`${insights.avgRoas.toFixed(2)}x`}
+              tooltip="Media del retorno por euro invertido. Por encima de 1x es rentable."
+              subtitle={`Por cada euro invertido, recuperas ${insights.avgRoas.toFixed(2)} EUR`}
+              variant={insights.avgRoas >= 1 ? "success" : "warning"}
             />
-            <KpiCard
-              title="Best Channel"
-              value={`${insights.bestChannel.roas.toFixed(2)}x`}
+            <MetricCard
               icon={Award}
+              label="Mejor canal"
+              value={`${insights.bestChannel.roas.toFixed(1)}x`}
+              tooltip={`${insights.bestChannel.label} es el canal con mayor retorno por euro invertido`}
               subtitle={insights.bestChannel.label}
-              trend="up"
-              trendLabel="Highest ROAS"
-            />
-            <KpiCard
-              title="Top 3 Concentration"
-              value={`${insights.top3ContribShare.toFixed(0)}%`}
-              icon={Zap}
-              trend={insights.top3ContribShare > 80 ? "down" : "up"}
-              trendLabel={insights.top3ContribShare > 80 ? "Highly concentrated" : "Well diversified"}
+              variant="success"
             />
           </div>
 
@@ -381,24 +346,24 @@ export default function ModelDetailPage() {
           <div className="grid gap-3 sm:grid-cols-2">
             {insights.overPerformers.length > 0 && (
               <InsightBanner type="success">
-                <strong>Over-performing channels:</strong>{" "}
-                {insights.overPerformers.map(c => c.label).join(", ")} — these channels generate more contribution than their spend share. Consider increasing investment.
+                <strong>Canales estrella:</strong>{" "}
+                {insights.overPerformers.map(c => c.label).join(", ")} — generan mas ventas proporcionalmente a lo que cuestan. Considera aumentar la inversion.
               </InsightBanner>
             )}
             {insights.underPerformers.length > 0 && (
               <InsightBanner type="warning">
-                <strong>Under-performing channels:</strong>{" "}
-                {insights.underPerformers.map(c => c.label).join(", ")} — these channels consume more budget relative to their contribution. Evaluate for possible reallocation.
+                <strong>Canales a revisar:</strong>{" "}
+                {insights.underPerformers.map(c => c.label).join(", ")} — consumen mas presupuesto del que justifican en ventas. Evalua redistribuir la inversion.
               </InsightBanner>
             )}
             {insights.avgGap > 5 && (
-              <InsightBanner type="info">
-                <strong>Budget misallocation detected.</strong> Average efficiency gap is {insights.avgGap.toFixed(1)}pp. Running the optimizer could reallocate spend for a significant uplift.
+              <InsightBanner type="opportunity">
+                <strong>Oportunidad de mejora.</strong> La diferencia media entre inversion y contribucion es de {insights.avgGap.toFixed(1)}pp. Optimizar el presupuesto podria mejorar significativamente los resultados.
               </InsightBanner>
             )}
             {insights.worstChannel.roas < 0.5 && (
               <InsightBanner type="warning">
-                <strong>{insights.worstChannel.label}</strong> has a ROAS of only {insights.worstChannel.roas.toFixed(2)}x — each dollar returns less than $0.50. Consider testing spend reduction.
+                <strong>{insights.worstChannel.label}</strong> tiene un retorno de solo {insights.worstChannel.roas.toFixed(2)}x — por cada euro invertido, recuperas menos de 50 centimos. Considera reducir su presupuesto.
               </InsightBanner>
             )}
           </div>
@@ -409,28 +374,28 @@ export default function ModelDetailPage() {
       {isReady && (
         <Tabs defaultValue="efficiency">
           <TabsList className="flex-wrap">
-            <TabsTrigger value="efficiency">Channel Efficiency</TabsTrigger>
-            <TabsTrigger value="roas">ROAS Analysis</TabsTrigger>
-            <TabsTrigger value="contributions">Contributions</TabsTrigger>
-            <TabsTrigger value="timeseries">Over Time</TabsTrigger>
-            <TabsTrigger value="quadrant">Efficiency Map</TabsTrigger>
+            <TabsTrigger value="efficiency">Eficiencia por canal</TabsTrigger>
+            <TabsTrigger value="roas">Retorno (ROAS)</TabsTrigger>
+            <TabsTrigger value="contributions">Contribucion</TabsTrigger>
+            <TabsTrigger value="timeseries">Evolucion temporal</TabsTrigger>
+            <TabsTrigger value="quadrant">Mapa estrategico</TabsTrigger>
           </TabsList>
 
           {/* Efficiency Tab - Spend vs Contribution table + chart */}
           <TabsContent value="efficiency" className="mt-4 space-y-4">
             <Card>
               <CardHeader>
-                <CardTitle>Spend vs Contribution by Channel</CardTitle>
+                <CardTitle>Inversion vs Contribucion por canal</CardTitle>
                 <CardDescription>
-                  Compare how much each channel spends vs how much it contributes to sales.
-                  Green bars indicate over-performers; channels where contribution share exceeds spend share.
+                  Compara cuanto inviertes en cada canal frente a cuantas ventas genera.
+                  Los canales eficientes generan mas ventas proporcionalmente a su coste.
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 {effLoading ? (
                   <Skeleton className="h-80 w-full" />
                 ) : !efficiencyData ? (
-                  <p className="text-sm text-muted-foreground py-8 text-center">No data available</p>
+                  <p className="text-sm text-muted-foreground py-8 text-center">Sin datos disponibles</p>
                 ) : (
                   <div className="space-y-6">
                     <ResponsiveContainer width="100%" height={350}>
@@ -443,16 +408,16 @@ export default function ModelDetailPage() {
                           contentStyle={{ borderRadius: "8px", border: "1px solid #e2e8f0" }}
                         />
                         <Legend />
-                        <Bar dataKey="total_spend" fill="#94a3b8" name="Spend" radius={[4, 4, 0, 0]} />
-                        <Bar dataKey="total_contribution" fill="#6366f1" name="Contribution" radius={[4, 4, 0, 0]} />
+                        <Bar dataKey="total_spend" fill="#94a3b8" name="Inversion" radius={[4, 4, 0, 0]} />
+                        <Bar dataKey="total_contribution" fill="#6366f1" name="Ventas atribuidas" radius={[4, 4, 0, 0]} />
                       </BarChart>
                     </ResponsiveContainer>
 
                     {/* Spend Share vs Contribution Share comparison */}
                     <Card className="bg-muted/30">
                       <CardHeader className="pb-2">
-                        <CardTitle className="text-sm">Spend Share vs Contribution Share</CardTitle>
-                        <CardDescription className="text-xs">Bars extending right mean the channel over-indexes on that metric</CardDescription>
+                <CardTitle className="text-sm">Cuota de inversion vs Cuota de ventas</CardTitle>
+                        <CardDescription className="text-xs">Las barras muestran que proporcion del presupuesto y de las ventas corresponde a cada canal</CardDescription>
                       </CardHeader>
                       <CardContent>
                         <div className="space-y-3">
@@ -475,8 +440,8 @@ export default function ModelDetailPage() {
                                   </div>
                                 </div>
                                 <div className="flex gap-1 text-[10px] text-muted-foreground">
-                                  <span className="flex-1">Spend: {ch.spend_share}%</span>
-                                  <span className="flex-1">Contrib: {ch.contribution_share}%</span>
+                                  <span className="flex-1">Inversion: {ch.spend_share}%</span>
+                                  <span className="flex-1">Ventas: {ch.contribution_share}%</span>
                                 </div>
                               </div>
                             );
@@ -489,14 +454,14 @@ export default function ModelDetailPage() {
                       <Table>
                         <TableHeader>
                           <TableRow>
-                            <TableHead>Channel</TableHead>
-                            <TableHead className="text-right">Spend</TableHead>
-                            <TableHead className="text-right">Spend %</TableHead>
-                            <TableHead className="text-right">Contribution</TableHead>
-                            <TableHead className="text-right">Contrib %</TableHead>
-                            <TableHead className="text-right">ROAS</TableHead>
-                            <TableHead className="text-right">Gap (pp)</TableHead>
-                            <TableHead className="text-right">Efficiency</TableHead>
+                            <TableHead>Canal</TableHead>
+                            <TableHead className="text-right">Inversion</TableHead>
+                            <TableHead className="text-right">% Inv.</TableHead>
+                            <TableHead className="text-right">Ventas</TableHead>
+                            <TableHead className="text-right">% Ventas</TableHead>
+                            <TableHead className="text-right">Retorno</TableHead>
+                            <TableHead className="text-right">Dif. (pp)</TableHead>
+                            <TableHead className="text-right">Estado</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -521,7 +486,7 @@ export default function ModelDetailPage() {
                                   <TableCell className="text-right">
                                     <span className={`inline-flex items-center gap-1 text-xs font-medium ${isEfficient ? "text-green-600" : "text-amber-600"}`}>
                                       {isEfficient ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownRight className="h-3 w-3" />}
-                                      {isEfficient ? "Over-performing" : "Under-performing"}
+                                      {isEfficient ? "Eficiente" : "A revisar"}
                                     </span>
                                   </TableCell>
                                 </TableRow>
@@ -541,16 +506,16 @@ export default function ModelDetailPage() {
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
               <Card className="lg:col-span-2">
                 <CardHeader>
-                  <CardTitle>Return on Ad Spend (ROAS)</CardTitle>
+                  <CardTitle>Retorno por euro invertido (ROAS)</CardTitle>
                   <CardDescription>
-                    Revenue generated per unit of spend. Green = profitable (&ge;1x), Yellow = below breakeven.
+                    Cuántos euros genera cada canal por cada euro invertido. Verde = rentable (1x o más), Amarillo = por debajo del umbral.
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
                   {roasLoading ? (
                     <Skeleton className="h-80 w-full" />
                   ) : roasChartData.length === 0 ? (
-                    <p className="text-sm text-muted-foreground py-8 text-center">No ROAS data available</p>
+                    <p className="text-sm text-muted-foreground py-8 text-center">Sin datos de retorno disponibles</p>
                   ) : (
                     <ResponsiveContainer width="100%" height={400}>
                       <BarChart data={roasChartData} layout="vertical" margin={{ left: 80 }}>
@@ -561,7 +526,7 @@ export default function ModelDetailPage() {
                           formatter={(value) => [Number(value).toFixed(2) + "x", "ROAS"]}
                           contentStyle={{ borderRadius: "8px", border: "1px solid #e2e8f0" }}
                         />
-                        <ReferenceLine x={1} stroke="#ef4444" strokeDasharray="3 3" label={{ value: "Breakeven", position: "top", fontSize: 10 }} />
+                        <ReferenceLine x={1} stroke="#ef4444" strokeDasharray="3 3" label={{ value: "Umbral rentabilidad", position: "top", fontSize: 10 }} />
                         <Bar dataKey="roas" fill="#6366f1" radius={[0, 4, 4, 0]}>
                           {roasChartData.map((entry, i) => (
                             <Cell key={i} fill={entry.roas >= 1 ? "#22c55e" : "#f59e0b"} />
@@ -576,8 +541,8 @@ export default function ModelDetailPage() {
               {/* ROAS Rankings */}
               <Card>
                 <CardHeader>
-                  <CardTitle className="text-sm">Channel Rankings</CardTitle>
-                  <CardDescription className="text-xs">By ROAS performance</CardDescription>
+                  <CardTitle className="text-sm">Ranking de canales</CardTitle>
+                  <CardDescription className="text-xs">Ordenados por retorno</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-3">
                   {roasChartData.map((item, i) => (
@@ -601,16 +566,16 @@ export default function ModelDetailPage() {
             {roasChartData.length > 0 && (
               <div className="grid gap-3 sm:grid-cols-3">
                 <InsightBanner type="success">
-                  <strong>{roasChartData.filter(c => c.roas >= 1).length}</strong> of {roasChartData.length} channels are above breakeven (ROAS &ge; 1x)
+                  <strong>{roasChartData.filter(c => c.roas >= 1).length}</strong> de {roasChartData.length} canales son rentables (retorno mayor o igual a 1x)
                 </InsightBanner>
                 <InsightBanner type="info">
-                  <strong>ROAS range:</strong> {roasChartData[roasChartData.length - 1]?.roas.toFixed(2)}x — {roasChartData[0]?.roas.toFixed(2)}x
-                  (spread: {(roasChartData[0]?.roas - roasChartData[roasChartData.length - 1]?.roas).toFixed(2)}x)
+                  <strong>Rango de retorno:</strong> desde {roasChartData[roasChartData.length - 1]?.roas.toFixed(2)}x hasta {roasChartData[0]?.roas.toFixed(2)}x
+                  (diferencia de {(roasChartData[0]?.roas - roasChartData[roasChartData.length - 1]?.roas).toFixed(2)}x)
                 </InsightBanner>
                 <InsightBanner type={roasChartData.filter(c => c.roas < 0.5).length > 0 ? "warning" : "success"}>
                   {roasChartData.filter(c => c.roas < 0.5).length > 0
-                    ? <><strong>{roasChartData.filter(c => c.roas < 0.5).length}</strong> channel(s) with very low ROAS (&lt;0.5x) — review for cutback</>
-                    : <>All channels show reasonable returns — no critical underperformers</>
+                    ? <><strong>{roasChartData.filter(c => c.roas < 0.5).length}</strong> canal(es) con retorno muy bajo (&lt;0.5x) — considera reducir inversión</>
+                    : <>Todos los canales muestran retornos razonables — sin casos críticos</>
                   }
                 </InsightBanner>
               </div>
@@ -621,16 +586,16 @@ export default function ModelDetailPage() {
           <TabsContent value="contributions" className="mt-4 space-y-4">
             <Card>
               <CardHeader>
-                <CardTitle>Channel Contributions</CardTitle>
+                <CardTitle>Contribución por canal</CardTitle>
                 <CardDescription>
-                  Share of total media-driven contribution by each marketing channel
+                  Qué proporción de las ventas genera cada canal de inversión
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 {contribLoading ? (
                   <Skeleton className="h-80 w-full" />
                 ) : contribChartData.length === 0 ? (
-                  <p className="text-sm text-muted-foreground py-8 text-center">No contribution data available</p>
+                  <p className="text-sm text-muted-foreground py-8 text-center">Sin datos de contribución disponibles</p>
                 ) : (
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                     <ResponsiveContainer width="100%" height={400}>
@@ -649,7 +614,7 @@ export default function ModelDetailPage() {
                             <Cell key={i} fill={COLORS[i % COLORS.length]} />
                           ))}
                         </Pie>
-                        <Tooltip formatter={(value) => [`${Number(value)}%`, "Contribution"]} />
+                        <Tooltip formatter={(value) => [`${Number(value)}%`, "Contribución"]} />
                         <Legend />
                       </PieChart>
                     </ResponsiveContainer>
@@ -688,9 +653,9 @@ export default function ModelDetailPage() {
             {contribData && (
               <Card>
                 <CardHeader>
-                  <CardTitle>Contribution Waterfall</CardTitle>
+                  <CardTitle>Cascada de contribución</CardTitle>
                   <CardDescription>
-                    Cumulative channel contribution to total media-driven revenue
+                    Contribución acumulada de cada canal al total de ventas generadas por medios
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -735,16 +700,16 @@ export default function ModelDetailPage() {
           <TabsContent value="timeseries" className="mt-4 space-y-4">
             <Card>
               <CardHeader>
-                <CardTitle>Channel Contributions Over Time</CardTitle>
+                <CardTitle>Contribucion de canales a lo largo del tiempo</CardTitle>
                 <CardDescription>
-                  Stacked area chart showing how each channel contributes to sales weekly
+                  Evolucion semanal de la contribucion de cada canal a las ventas
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 {tsLoading ? (
                   <Skeleton className="h-96 w-full" />
                 ) : tsChartData.length === 0 ? (
-                  <p className="text-sm text-muted-foreground py-8 text-center">No time series data available</p>
+                  <p className="text-sm text-muted-foreground py-8 text-center">Sin datos de serie temporal disponibles</p>
                 ) : (
                   <ResponsiveContainer width="100%" height={450}>
                     <AreaChart data={tsChartData} margin={{ left: 20 }}>
@@ -777,9 +742,9 @@ export default function ModelDetailPage() {
             {tsChartData.length > 0 && tsData?.target?.length ? (
               <Card>
                 <CardHeader>
-                  <CardTitle>Model Fit: Sales vs Total Channel Contribution</CardTitle>
+                  <CardTitle>Ajuste del modelo: Ventas reales vs Contribucion total</CardTitle>
                   <CardDescription>
-                    Actual sales overlaid with sum of all channel contributions. A close fit indicates the model explains sales well.
+                    Ventas reales comparadas con la suma de contribuciones de todos los canales. Un buen ajuste indica que el modelo explica bien las ventas.
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -789,7 +754,7 @@ export default function ModelDetailPage() {
                         const totalContrib = tsData.channels.reduce(
                           (sum, ch) => sum + (Number(point[ch.replace("spend_", "")]) || 0), 0
                         );
-                        return { date: point.date, Sales: point.Sales, "Total Contribution": totalContrib };
+                        return { date: point.date, Ventas: point.Sales, "Contribucion total": totalContrib };
                       })}
                       margin={{ left: 20 }}
                     >
@@ -801,8 +766,8 @@ export default function ModelDetailPage() {
                         contentStyle={{ borderRadius: "8px", border: "1px solid #e2e8f0" }}
                       />
                       <Legend />
-                      <Line type="monotone" dataKey="Sales" stroke="#6366f1" strokeWidth={2} dot={false} />
-                      <Line type="monotone" dataKey="Total Contribution" stroke="#f97316" strokeWidth={2} dot={false} strokeDasharray="5 5" />
+                      <Line type="monotone" dataKey="Ventas" stroke="#6366f1" strokeWidth={2} dot={false} />
+                      <Line type="monotone" dataKey="Contribucion total" stroke="#f97316" strokeWidth={2} dot={false} strokeDasharray="5 5" />
                     </LineChart>
                   </ResponsiveContainer>
                   {/* Model fit stats */}
@@ -819,14 +784,14 @@ export default function ModelDetailPage() {
                     return (
                       <div className="mt-4 grid grid-cols-2 gap-4">
                         <div className="p-3 rounded-lg bg-muted/50">
-                          <p className="text-xs text-muted-foreground">R-squared (media contribution)</p>
+                          <p className="text-xs text-muted-foreground">R-cuadrado (contribucion de medios)</p>
                           <p className="text-lg font-bold">{r2.toFixed(3)}</p>
-                          <p className="text-xs text-muted-foreground">{r2 > 0.7 ? "Good fit" : r2 > 0.4 ? "Moderate fit" : "Weak fit — base/intercept likely large"}</p>
+                          <p className="text-xs text-muted-foreground">{r2 > 0.7 ? "Buen ajuste" : r2 > 0.4 ? "Ajuste moderado" : "Ajuste debil — las ventas base son grandes"}</p>
                         </div>
                         <div className="p-3 rounded-lg bg-muted/50">
-                          <p className="text-xs text-muted-foreground">MAPE (mean absolute % error)</p>
+                          <p className="text-xs text-muted-foreground">MAPE (error medio absoluto %)</p>
                           <p className="text-lg font-bold">{mape.toFixed(1)}%</p>
-                          <p className="text-xs text-muted-foreground">{mape < 15 ? "Excellent accuracy" : mape < 30 ? "Acceptable accuracy" : "High error — review model"}</p>
+                          <p className="text-xs text-muted-foreground">{mape < 15 ? "Precision excelente" : mape < 30 ? "Precision aceptable" : "Error alto — revisa el modelo"}</p>
                         </div>
                       </div>
                     );
@@ -839,8 +804,8 @@ export default function ModelDetailPage() {
             {tsChartData.length > 0 && tsData && (
               <Card>
                 <CardHeader>
-                  <CardTitle>Individual Channel Trends</CardTitle>
-                  <CardDescription>Weekly contribution per channel — spot seasonality and trends</CardDescription>
+                  <CardTitle>Tendencia individual por canal</CardTitle>
+                  <CardDescription>Contribucion semanal por canal — detecta estacionalidad y tendencias</CardDescription>
                 </CardHeader>
                 <CardContent>
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -882,9 +847,9 @@ export default function ModelDetailPage() {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               <Card>
                 <CardHeader>
-                  <CardTitle>Efficiency Scatter Plot</CardTitle>
+                  <CardTitle>Mapa de eficiencia</CardTitle>
                   <CardDescription>
-                    Spend Share vs Contribution Share — channels above the diagonal line are efficient
+                    Cuota de inversion vs Cuota de ventas — los canales por encima de la diagonal son eficientes
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -894,15 +859,15 @@ export default function ModelDetailPage() {
                     <ResponsiveContainer width="100%" height={400}>
                       <ScatterChart margin={{ left: 10, right: 20, top: 10, bottom: 10 }}>
                         <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis type="number" dataKey="spend_share" name="Spend Share %" unit="%" tick={{ fontSize: 11 }} />
-                        <YAxis type="number" dataKey="contribution_share" name="Contribution Share %" unit="%" tick={{ fontSize: 11 }} />
-                        <ZAxis type="number" dataKey="total_spend" range={[100, 800]} name="Total Spend" />
+                        <XAxis type="number" dataKey="spend_share" name="% Inversion" unit="%" tick={{ fontSize: 11 }} />
+                        <YAxis type="number" dataKey="contribution_share" name="% Ventas" unit="%" tick={{ fontSize: 11 }} />
+                        <ZAxis type="number" dataKey="total_spend" range={[100, 800]} name="Inversion total" />
                         <Tooltip
                           formatter={(value, name) => [typeof value === "number" ? value.toFixed(1) : value, name]}
                           contentStyle={{ borderRadius: "8px", border: "1px solid #e2e8f0" }}
                         />
                         <ReferenceLine segment={[{ x: 0, y: 0 }, { x: 50, y: 50 }]} stroke="#94a3b8" strokeDasharray="5 5" />
-                        <Scatter data={scatterData} name="Channels">
+                        <Scatter data={scatterData} name="Canales">
                           {scatterData.map((entry, i) => (
                             <Cell key={i} fill={entry.contribution_share > entry.spend_share ? "#22c55e" : "#f59e0b"} />
                           ))}
@@ -915,9 +880,9 @@ export default function ModelDetailPage() {
 
               <Card>
                 <CardHeader>
-                  <CardTitle>Channel Radar</CardTitle>
+                  <CardTitle>Radar de canales</CardTitle>
                   <CardDescription>
-                    Multi-dimensional view: Spend Share, Contribution Share, and ROAS per channel
+                    Vista multidimensional: cuota de inversion, cuota de ventas y retorno por canal
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -929,9 +894,9 @@ export default function ModelDetailPage() {
                         <PolarGrid />
                         <PolarAngleAxis dataKey="channel" tick={{ fontSize: 10 }} />
                         <PolarRadiusAxis tick={{ fontSize: 9 }} />
-                        <Radar name="Spend Share" dataKey="Spend Share" stroke="#94a3b8" fill="#94a3b8" fillOpacity={0.3} />
-                        <Radar name="Contribution Share" dataKey="Contribution Share" stroke="#6366f1" fill="#6366f1" fillOpacity={0.3} />
-                        <Radar name="ROAS (scaled)" dataKey="ROAS (scaled)" stroke="#22c55e" fill="#22c55e" fillOpacity={0.15} />
+                        <Radar name="% Inversion" dataKey="Spend Share" stroke="#94a3b8" fill="#94a3b8" fillOpacity={0.3} />
+                        <Radar name="% Ventas" dataKey="Contribution Share" stroke="#6366f1" fill="#6366f1" fillOpacity={0.3} />
+                        <Radar name="Retorno (escalado)" dataKey="ROAS (scaled)" stroke="#22c55e" fill="#22c55e" fillOpacity={0.15} />
                         <Legend />
                         <Tooltip contentStyle={{ borderRadius: "8px", border: "1px solid #e2e8f0" }} />
                       </RadarChart>
@@ -945,17 +910,17 @@ export default function ModelDetailPage() {
             {efficiencyData && (
               <Card>
                 <CardHeader>
-                  <CardTitle>Channel Classification</CardTitle>
-                  <CardDescription>Strategic recommendations based on ROAS and spend share</CardDescription>
+                  <CardTitle>Clasificacion estrategica de canales</CardTitle>
+                  <CardDescription>Recomendaciones basadas en retorno y cuota de inversion</CardDescription>
                 </CardHeader>
                 <CardContent>
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                     {/* Stars: High ROAS, high spend */}
                     <div className="p-4 rounded-lg border-2 border-green-200 bg-green-50/50 dark:bg-green-950/30 dark:border-green-800">
                       <h4 className="text-sm font-semibold text-green-700 dark:text-green-400 mb-2 flex items-center gap-1">
-                        <Award className="h-4 w-4" /> Stars
+                        <Award className="h-4 w-4" /> Estrellas
                       </h4>
-                      <p className="text-xs text-muted-foreground mb-2">High ROAS + High Spend — protect and maintain</p>
+                      <p className="text-xs text-muted-foreground mb-2">Alto retorno + Alta inversion — proteger y mantener</p>
                       <div className="space-y-1">
                         {efficiencyData.channels.filter(c => c.roas >= (insights?.avgRoas || 1) && c.spend_share >= 100 / efficiencyData.channels.length).map(c => (
                           <Badge key={c.channel} variant="outline" className="mr-1 border-green-300">{c.label}</Badge>
@@ -968,9 +933,9 @@ export default function ModelDetailPage() {
                     {/* Growth: High ROAS, low spend */}
                     <div className="p-4 rounded-lg border-2 border-blue-200 bg-blue-50/50 dark:bg-blue-950/30 dark:border-blue-800">
                       <h4 className="text-sm font-semibold text-blue-700 dark:text-blue-400 mb-2 flex items-center gap-1">
-                        <TrendingUp className="h-4 w-4" /> Growth Opportunities
+                        <TrendingUp className="h-4 w-4" /> Oportunidades de crecimiento
                       </h4>
-                      <p className="text-xs text-muted-foreground mb-2">High ROAS + Low Spend — increase investment</p>
+                      <p className="text-xs text-muted-foreground mb-2">Alto retorno + Baja inversion — aumentar inversion</p>
                       <div className="space-y-1">
                         {efficiencyData.channels.filter(c => c.roas >= (insights?.avgRoas || 1) && c.spend_share < 100 / efficiencyData.channels.length).map(c => (
                           <Badge key={c.channel} variant="outline" className="mr-1 border-blue-300">{c.label}</Badge>
@@ -983,9 +948,9 @@ export default function ModelDetailPage() {
                     {/* Optimize: Low ROAS, high spend */}
                     <div className="p-4 rounded-lg border-2 border-amber-200 bg-amber-50/50 dark:bg-amber-950/30 dark:border-amber-800">
                       <h4 className="text-sm font-semibold text-amber-700 dark:text-amber-400 mb-2 flex items-center gap-1">
-                        <Target className="h-4 w-4" /> Needs Optimization
+                        <Target className="h-4 w-4" /> Necesitan optimizacion
                       </h4>
-                      <p className="text-xs text-muted-foreground mb-2">Low ROAS + High Spend — optimize or reduce</p>
+                      <p className="text-xs text-muted-foreground mb-2">Bajo retorno + Alta inversion — optimizar o reducir</p>
                       <div className="space-y-1">
                         {efficiencyData.channels.filter(c => c.roas < (insights?.avgRoas || 1) && c.spend_share >= 100 / efficiencyData.channels.length).map(c => (
                           <Badge key={c.channel} variant="outline" className="mr-1 border-amber-300">{c.label}</Badge>
@@ -998,9 +963,9 @@ export default function ModelDetailPage() {
                     {/* Question marks: Low ROAS, low spend */}
                     <div className="p-4 rounded-lg border-2 border-slate-200 bg-slate-50/50 dark:bg-slate-950/30 dark:border-slate-700">
                       <h4 className="text-sm font-semibold text-slate-600 dark:text-slate-400 mb-2 flex items-center gap-1">
-                        <TrendingDown className="h-4 w-4" /> Question Marks
+                        <TrendingDown className="h-4 w-4" /> En duda
                       </h4>
-                      <p className="text-xs text-muted-foreground mb-2">Low ROAS + Low Spend — test or drop</p>
+                      <p className="text-xs text-muted-foreground mb-2">Bajo retorno + Baja inversion — probar o eliminar</p>
                       <div className="space-y-1">
                         {efficiencyData.channels.filter(c => c.roas < (insights?.avgRoas || 1) && c.spend_share < 100 / efficiencyData.channels.length).map(c => (
                           <Badge key={c.channel} variant="outline" className="mr-1 border-slate-300">{c.label}</Badge>

@@ -5,7 +5,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuthStore } from "@/stores/auth-store";
 import { createClient } from "@/lib/supabase/client";
 import { datasets } from "@/lib/api";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -36,6 +36,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
+import { SectionHeader, InfoTooltip } from "@/components/marketing";
 import Link from "next/link";
 import {
   Database,
@@ -50,6 +51,9 @@ import {
   ChevronUp,
   Eye,
   ArrowDownToLine,
+  CheckCircle2,
+  AlertCircle,
+  Sparkles,
 } from "lucide-react";
 
 interface MmmDataSummary {
@@ -76,6 +80,12 @@ interface MmmDataRow {
   summer_sale: string;
   sales: number;
 }
+
+const countryLabels: Record<string, string> = {
+  ES: "Espana",
+  FR: "Francia",
+  IT: "Italia",
+};
 
 export default function DatasetsPage() {
   const { currentOrgId } = useAuthStore();
@@ -134,20 +144,19 @@ export default function DatasetsPage() {
       formData.append("project_id", selectedProject);
 
       await datasets.upload(currentOrgId, formData);
-      toast.success("Dataset uploaded and validated");
+      toast.success("Datos subidos y validados correctamente");
       queryClient.invalidateQueries({ queryKey: ["datasets"] });
       setOpen(false);
       setName("");
       setFile(null);
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : "Upload failed";
+      const message = err instanceof Error ? err.message : "Error al subir datos";
       toast.error(message);
     } finally {
       setUploading(false);
     }
   }
 
-  // Fetch pre-loaded mmm_data summary per country
   const { data: mmmSummary, isLoading: mmmLoading } = useQuery({
     queryKey: ["mmm-data-summary"],
     queryFn: async (): Promise<MmmDataSummary[]> => {
@@ -185,7 +194,6 @@ export default function DatasetsPage() {
     },
   });
 
-  // Fetch preview rows for a specific country
   const { data: previewData, isLoading: previewLoading } = useQuery({
     queryKey: ["mmm-data-preview", previewCountry],
     queryFn: async (): Promise<MmmDataRow[]> => {
@@ -202,19 +210,16 @@ export default function DatasetsPage() {
     enabled: !!previewCountry,
   });
 
-  // Import pre-loaded data as a dataset
   const importMut = useMutation({
     mutationFn: async ({ country, projectId }: { country: string; projectId: string }) => {
       const supabase = createClient();
       const summary = mmmSummary?.find((s) => s.country === country);
-      if (!summary) throw new Error("Country data not found");
-
-      const countryName = country === "ES" ? "Spain" : country === "FR" ? "France" : country === "IT" ? "Italy" : country;
+      if (!summary) throw new Error("Datos del pais no encontrados");
 
       const { error } = await supabase.from("datasets").insert({
         org_id: currentOrgId!,
         project_id: projectId,
-        name: `MMM Data - ${countryName} (${country})`,
+        name: `Datos Marketing - ${countryLabels[country] || country}`,
         file_path: `mmm_data:${country}`,
         status: "validated",
         row_count: summary.rows,
@@ -230,14 +235,13 @@ export default function DatasetsPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["datasets"] });
-      toast.success("Pre-loaded data imported as dataset");
+      toast.success("Datos importados como conjunto de datos");
       setImportCountry(null);
       setImportProject("");
     },
     onError: (err: Error) => toast.error(err.message),
   });
 
-  // Auto-select first project for viewing
   useEffect(() => {
     if (projectList?.length && !viewProject) {
       setViewProject(projectList[0].id);
@@ -245,35 +249,33 @@ export default function DatasetsPage() {
   }, [projectList, viewProject]);
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Datasets</h1>
-          <p className="text-muted-foreground mt-1">
-            Pre-loaded Supabase data and uploaded CSV files
-          </p>
-        </div>
+    <div className="space-y-8">
+      <SectionHeader
+        icon={Database}
+        title="Mis Datos"
+        description="Aqui gestionas tus datos de inversion publicitaria y ventas. Sube un CSV con tus datos semanales o usa los datos de ejemplo para empezar."
+      >
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild>
-            <Button>
-              <Upload className="mr-2 h-4 w-4" />
-              Upload Dataset
+            <Button className="gap-2">
+              <Upload className="h-4 w-4" />
+              Subir datos
             </Button>
           </DialogTrigger>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Upload Dataset</DialogTitle>
+              <DialogTitle>Subir datos de inversion</DialogTitle>
               <DialogDescription>
-                Upload a CSV file with your marketing spend and KPI data.
-                The file will be validated for MMM compatibility.
+                Sube un archivo CSV con tus datos semanales de gasto publicitario y ventas.
+                Lo validaremos automaticamente.
               </DialogDescription>
             </DialogHeader>
             <form onSubmit={handleUpload} className="space-y-4">
               <div className="space-y-2">
-                <Label>Project</Label>
+                <Label>Proyecto</Label>
                 <Select value={selectedProject} onValueChange={setSelectedProject}>
                   <SelectTrigger>
-                    <SelectValue placeholder="Select project" />
+                    <SelectValue placeholder="Seleccionar proyecto" />
                   </SelectTrigger>
                   <SelectContent>
                     {projectList?.map((p) => (
@@ -285,17 +287,17 @@ export default function DatasetsPage() {
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="dataset-name">Dataset Name</Label>
+                <Label htmlFor="dataset-name">Nombre del conjunto de datos</Label>
                 <Input
                   id="dataset-name"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  placeholder="e.g. US Marketing Data 2024"
+                  placeholder="Ej: Datos Marketing Espana 2024"
                   required
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="csv-file">CSV File</Label>
+                <Label htmlFor="csv-file">Archivo CSV</Label>
                 <Input
                   id="csv-file"
                   type="file"
@@ -304,48 +306,68 @@ export default function DatasetsPage() {
                   required
                 />
                 <p className="text-xs text-muted-foreground">
-                  Max 10MB. Must contain a date column, target column, and spend columns.
+                  Max 10MB. Debe contener una columna de fecha, una de ventas y columnas de gasto por canal.
                 </p>
               </div>
+
+              {/* Requirements hint */}
+              <div className="rounded-lg bg-muted/50 border border-border/50 p-3 space-y-2">
+                <p className="text-xs font-medium text-foreground">Tu archivo debe incluir:</p>
+                <ul className="text-xs text-muted-foreground space-y-1.5">
+                  <li className="flex items-start gap-2">
+                    <Calendar className="h-3 w-3 mt-0.5 shrink-0 text-primary" />
+                    <span>Columna de fecha (semanal), ej: <code className="text-[10px] bg-muted px-1 rounded">date_week</code></span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <Hash className="h-3 w-3 mt-0.5 shrink-0 text-primary" />
+                    <span>Columna de ventas o KPI objetivo, ej: <code className="text-[10px] bg-muted px-1 rounded">sales</code></span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <Columns3 className="h-3 w-3 mt-0.5 shrink-0 text-primary" />
+                    <span>Columnas de gasto por canal con prefijo <code className="text-[10px] bg-muted px-1 rounded">spend_</code></span>
+                  </li>
+                </ul>
+              </div>
+
               <Button
                 type="submit"
                 className="w-full"
                 disabled={uploading || !selectedProject || !file}
               >
                 {uploading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Upload & Validate
+                Subir y validar
               </Button>
             </form>
           </DialogContent>
         </Dialog>
-      </div>
+      </SectionHeader>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList>
-          <TabsTrigger value="preloaded">
-            <Database className="mr-2 h-4 w-4" />
-            Pre-loaded Data
+          <TabsTrigger value="preloaded" className="gap-2">
+            <Sparkles className="h-3.5 w-3.5" />
+            Datos de ejemplo
           </TabsTrigger>
-          <TabsTrigger value="uploaded">
-            <FileSpreadsheet className="mr-2 h-4 w-4" />
-            Uploaded Datasets
+          <TabsTrigger value="uploaded" className="gap-2">
+            <FileSpreadsheet className="h-3.5 w-3.5" />
+            Mis archivos
           </TabsTrigger>
         </TabsList>
 
-        {/* ========== PRE-LOADED DATA TAB ========== */}
-        <TabsContent value="preloaded" className="mt-4 space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Database className="h-5 w-5" />
-                Supabase Pre-loaded Data
-              </CardTitle>
-              <CardDescription>
-                Marketing data already stored in the <code className="text-xs bg-muted px-1 py-0.5 rounded">mmm_data</code> table.
-                Available for training models directly.
-              </CardDescription>
-            </CardHeader>
-          </Card>
+        {/* ── Pre-loaded data ──────────────────────────────────────────── */}
+        <TabsContent value="preloaded" className="mt-6 space-y-4">
+          <div className="flex items-start gap-3 rounded-xl border border-primary/20 bg-primary/5 px-5 py-4">
+            <Sparkles className="h-5 w-5 text-primary shrink-0 mt-0.5" />
+            <div>
+              <p className="text-sm font-medium text-foreground">
+                Datos de ejemplo listos para usar
+              </p>
+              <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
+                Estos datos de marketing por pais ya estan cargados en la plataforma.
+                Puedes usarlos para probar el analisis sin necesidad de subir nada.
+              </p>
+            </div>
+          </div>
 
           {mmmLoading ? (
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -357,12 +379,12 @@ export default function DatasetsPage() {
             <>
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 {(mmmSummary || []).map((summary) => (
-                  <Card
+                  <div
                     key={summary.country}
-                    className={`transition-colors cursor-pointer ${
+                    className={`rounded-xl border bg-card p-5 space-y-4 transition-all cursor-pointer ${
                       previewCountry === summary.country
-                        ? "border-primary"
-                        : "hover:border-primary/50"
+                        ? "border-primary shadow-sm"
+                        : "hover:border-primary/40 hover:shadow-sm"
                     }`}
                     onClick={() =>
                       setPreviewCountry(
@@ -370,104 +392,114 @@ export default function DatasetsPage() {
                       )
                     }
                   >
-                    <CardHeader className="pb-3">
-                      <div className="flex items-center justify-between">
-                        <CardTitle className="text-base flex items-center gap-2">
-                          <Globe className="h-4 w-4 text-primary" />
-                          {summary.country === "ES"
-                            ? "Spain"
-                            : summary.country === "FR"
-                            ? "France"
-                            : summary.country === "IT"
-                            ? "Italy"
-                            : summary.country}
-                        </CardTitle>
-                        <Badge variant="outline" className="text-xs">
-                          {summary.country}
-                        </Badge>
-                      </div>
-                    </CardHeader>
-                    <CardContent className="space-y-3">
-                      <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                        <span className="flex items-center gap-1">
-                          <Hash className="h-3 w-3" />
-                          {summary.rows.toLocaleString()} rows
-                        </span>
-                        <span className="flex items-center gap-1">
-                          <Columns3 className="h-3 w-3" />
-                          {summary.columns.length} cols
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                        <Calendar className="h-3 w-3" />
-                        {summary.min_date} — {summary.max_date}
-                      </div>
-                      <div>
-                        <p className="text-xs text-muted-foreground mb-1">Spend channels</p>
-                        <div className="flex flex-wrap gap-1">
-                          {summary.spend_columns.map((col) => (
-                            <Badge key={col} variant="secondary" className="text-xs">
-                              {col.replace("spend_", "")}
-                            </Badge>
-                          ))}
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2.5">
+                        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                          <Globe className="h-4.5 w-4.5" />
+                        </div>
+                        <div>
+                          <h3 className="text-sm font-semibold">
+                            {countryLabels[summary.country] || summary.country}
+                          </h3>
+                          <p className="text-[11px] text-muted-foreground">
+                            {summary.rows.toLocaleString("es-ES")} semanas de datos
+                          </p>
                         </div>
                       </div>
-                      <div>
-                        <p className="text-xs text-muted-foreground mb-1">Controls</p>
-                        <div className="flex flex-wrap gap-1">
-                          {summary.control_columns.map((col) => (
-                            <Badge key={col} variant="outline" className="text-xs">
-                              {col}
-                            </Badge>
-                          ))}
-                        </div>
+                      <Badge variant="outline" className="text-[10px]">
+                        {summary.country}
+                      </Badge>
+                    </div>
+
+                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                      <Calendar className="h-3 w-3" />
+                      <span>
+                        {new Date(summary.min_date).toLocaleDateString("es-ES", { month: "short", year: "numeric" })}
+                        {" — "}
+                        {new Date(summary.max_date).toLocaleDateString("es-ES", { month: "short", year: "numeric" })}
+                      </span>
+                    </div>
+
+                    <div>
+                      <p className="text-[11px] text-muted-foreground mb-1.5 flex items-center gap-1">
+                        Canales de inversion
+                        <InfoTooltip content="Columnas que representan el gasto semanal en cada canal publicitario" />
+                      </p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {summary.spend_columns.map((col) => (
+                          <span
+                            key={col}
+                            className="inline-flex items-center rounded-md bg-primary/8 px-2 py-0.5 text-[11px] font-medium text-primary"
+                          >
+                            {col.replace("spend_", "")}
+                          </span>
+                        ))}
                       </div>
-                      <div className="flex items-center justify-between">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="text-xs gap-1"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setImportCountry(summary.country);
-                            if (projectList?.length) setImportProject(projectList[0].id);
-                          }}
-                        >
-                          <ArrowDownToLine className="h-3 w-3" />
-                          Use for Training
-                        </Button>
-                        <Button variant="ghost" size="sm" className="text-xs gap-1">
-                          <Eye className="h-3 w-3" />
-                          {previewCountry === summary.country ? "Hide" : "Preview"}
-                          {previewCountry === summary.country ? (
-                            <ChevronUp className="h-3 w-3" />
-                          ) : (
-                            <ChevronDown className="h-3 w-3" />
-                          )}
-                        </Button>
+                    </div>
+
+                    <div>
+                      <p className="text-[11px] text-muted-foreground mb-1.5 flex items-center gap-1">
+                        Eventos
+                        <InfoTooltip content="Eventos especiales que pueden afectar las ventas, como rebajas o festivos" />
+                      </p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {summary.control_columns.map((col) => (
+                          <span
+                            key={col}
+                            className="inline-flex items-center rounded-md bg-muted px-2 py-0.5 text-[11px] text-muted-foreground"
+                          >
+                            {col.replace(/_/g, " ")}
+                          </span>
+                        ))}
                       </div>
-                    </CardContent>
-                  </Card>
+                    </div>
+
+                    <div className="flex items-center justify-between pt-1">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="text-xs gap-1.5 h-8"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setImportCountry(summary.country);
+                          if (projectList?.length) setImportProject(projectList[0].id);
+                        }}
+                      >
+                        <ArrowDownToLine className="h-3 w-3" />
+                        Usar estos datos
+                      </Button>
+                      <Button variant="ghost" size="sm" className="text-xs gap-1 h-8">
+                        <Eye className="h-3 w-3" />
+                        {previewCountry === summary.country ? "Ocultar" : "Vista previa"}
+                        {previewCountry === summary.country ? (
+                          <ChevronUp className="h-3 w-3" />
+                        ) : (
+                          <ChevronDown className="h-3 w-3" />
+                        )}
+                      </Button>
+                    </div>
+                  </div>
                 ))}
               </div>
 
-              {/* Import to project dialog */}
+              {/* Import dialog */}
               <Dialog open={!!importCountry} onOpenChange={(v) => { if (!v) setImportCountry(null); }}>
                 <DialogContent>
                   <DialogHeader>
-                    <DialogTitle>Import Pre-loaded Data</DialogTitle>
+                    <DialogTitle>Importar datos de ejemplo</DialogTitle>
                     <DialogDescription>
-                      Import {importCountry === "ES" ? "Spain" : importCountry === "FR" ? "France" : importCountry === "IT" ? "Italy" : importCountry} data
-                      into a project so it can be used for model training.
+                      Importar datos de{" "}
+                      {importCountry ? countryLabels[importCountry] || importCountry : ""}{" "}
+                      a un proyecto para poder lanzar un analisis.
                     </DialogDescription>
                   </DialogHeader>
                   <div className="space-y-4">
                     <div className="space-y-2">
-                      <Label>Target Project</Label>
+                      <Label>Proyecto destino</Label>
                       {projectList && projectList.length > 0 ? (
                         <Select value={importProject} onValueChange={setImportProject}>
                           <SelectTrigger>
-                            <SelectValue placeholder="Select project" />
+                            <SelectValue placeholder="Seleccionar proyecto" />
                           </SelectTrigger>
                           <SelectContent>
                             {projectList.map((p) => (
@@ -476,33 +508,36 @@ export default function DatasetsPage() {
                           </SelectContent>
                         </Select>
                       ) : (
-                        <p className="text-sm text-muted-foreground">
-                          No projects yet. Create a project first from the Projects page.
-                        </p>
+                        <div className="flex items-start gap-2 rounded-lg bg-amber-50 border border-amber-200 p-3 dark:bg-amber-950/30 dark:border-amber-800">
+                          <AlertCircle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
+                          <p className="text-xs text-amber-800 dark:text-amber-200">
+                            No tienes proyectos. Crea uno primero desde la seccion de Configuracion.
+                          </p>
+                        </div>
                       )}
                     </div>
                     <Button
-                      className="w-full"
+                      className="w-full gap-2"
                       disabled={!importProject || !importCountry || importMut.isPending}
                       onClick={() => importMut.mutate({ country: importCountry!, projectId: importProject })}
                     >
-                      {importMut.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                      <ArrowDownToLine className="mr-2 h-4 w-4" />
-                      Import as Dataset
+                      {importMut.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+                      <ArrowDownToLine className="h-4 w-4" />
+                      Importar datos
                     </Button>
                   </div>
                 </DialogContent>
               </Dialog>
 
-              {/* Data preview table */}
+              {/* Data preview */}
               {previewCountry && (
                 <Card>
                   <CardHeader>
                     <CardTitle className="text-base flex items-center gap-2">
                       <Eye className="h-4 w-4" />
-                      Data Preview — {previewCountry}
-                      <Badge variant="outline" className="ml-2 text-xs">
-                        Latest 20 rows
+                      Vista previa — {countryLabels[previewCountry] || previewCountry}
+                      <Badge variant="outline" className="ml-2 text-[10px]">
+                        Ultimas 20 semanas
                       </Badge>
                     </CardTitle>
                   </CardHeader>
@@ -510,50 +545,62 @@ export default function DatasetsPage() {
                     {previewLoading ? (
                       <Skeleton className="h-64 w-full" />
                     ) : previewData && previewData.length > 0 ? (
-                      <div className="rounded-md border overflow-auto max-h-96">
+                      <div className="rounded-lg border overflow-auto max-h-96">
                         <Table>
                           <TableHeader>
                             <TableRow>
-                              <TableHead>Date</TableHead>
-                              <TableHead>Display</TableHead>
-                              <TableHead>Social</TableHead>
-                              <TableHead>SEM</TableHead>
-                              <TableHead>TikTok</TableHead>
-                              <TableHead>Sales</TableHead>
-                              <TableHead>BF</TableHead>
-                              <TableHead>Xmas</TableHead>
-                              <TableHead>Summer</TableHead>
+                              <TableHead className="text-xs">Semana</TableHead>
+                              <TableHead className="text-xs">Display</TableHead>
+                              <TableHead className="text-xs">Social</TableHead>
+                              <TableHead className="text-xs">SEM</TableHead>
+                              <TableHead className="text-xs">TikTok</TableHead>
+                              <TableHead className="text-xs font-semibold">Ventas</TableHead>
+                              <TableHead className="text-xs">Black Friday</TableHead>
+                              <TableHead className="text-xs">Navidad</TableHead>
+                              <TableHead className="text-xs">Rebajas</TableHead>
                             </TableRow>
                           </TableHeader>
                           <TableBody>
                             {previewData.map((row, i) => (
                               <TableRow key={i}>
                                 <TableCell className="font-mono text-xs">
-                                  {row.date_week}
+                                  {new Date(row.date_week).toLocaleDateString("es-ES", { day: "2-digit", month: "short", year: "2-digit" })}
                                 </TableCell>
                                 <TableCell className="text-xs">
-                                  {Number(row.spend_Display).toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                                  {Number(row.spend_Display).toLocaleString("es-ES", { maximumFractionDigits: 0 })}
                                 </TableCell>
                                 <TableCell className="text-xs">
-                                  {Number(row.spend_Social).toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                                  {Number(row.spend_Social).toLocaleString("es-ES", { maximumFractionDigits: 0 })}
                                 </TableCell>
                                 <TableCell className="text-xs">
-                                  {Number(row.spend_SEM).toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                                  {Number(row.spend_SEM).toLocaleString("es-ES", { maximumFractionDigits: 0 })}
                                 </TableCell>
                                 <TableCell className="text-xs">
                                   {row.spend_TikTok || "—"}
                                 </TableCell>
-                                <TableCell className="text-xs font-medium">
-                                  {Number(row.sales).toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                                <TableCell className="text-xs font-semibold text-foreground">
+                                  {Number(row.sales).toLocaleString("es-ES", { maximumFractionDigits: 0 })}
                                 </TableCell>
                                 <TableCell className="text-xs">
-                                  {row.black_friday === "1" ? "✓" : "—"}
+                                  {row.black_friday === "1" ? (
+                                    <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
+                                  ) : (
+                                    <span className="text-muted-foreground/40">—</span>
+                                  )}
                                 </TableCell>
                                 <TableCell className="text-xs">
-                                  {row.christmas === "1" ? "✓" : "—"}
+                                  {row.christmas === "1" ? (
+                                    <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
+                                  ) : (
+                                    <span className="text-muted-foreground/40">—</span>
+                                  )}
                                 </TableCell>
                                 <TableCell className="text-xs">
-                                  {row.summer_sale === "1" ? "✓" : "—"}
+                                  {row.summer_sale === "1" ? (
+                                    <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
+                                  ) : (
+                                    <span className="text-muted-foreground/40">—</span>
+                                  )}
                                 </TableCell>
                               </TableRow>
                             ))}
@@ -561,7 +608,7 @@ export default function DatasetsPage() {
                         </Table>
                       </div>
                     ) : (
-                      <p className="text-sm text-muted-foreground">No data available</p>
+                      <p className="text-sm text-muted-foreground">Sin datos disponibles</p>
                     )}
                   </CardContent>
                 </Card>
@@ -570,15 +617,14 @@ export default function DatasetsPage() {
           )}
         </TabsContent>
 
-        {/* ========== UPLOADED DATASETS TAB ========== */}
-        <TabsContent value="uploaded" className="mt-4 space-y-4">
-          {/* Project filter */}
+        {/* ── Uploaded datasets ────────────────────────────────────────── */}
+        <TabsContent value="uploaded" className="mt-6 space-y-4">
           {projectList && projectList.length > 0 && (
-            <div className="flex items-center gap-2">
-              <Label className="text-sm text-muted-foreground">Filter by project:</Label>
+            <div className="flex items-center gap-3">
+              <Label className="text-sm text-muted-foreground whitespace-nowrap">Proyecto:</Label>
               <Select value={viewProject} onValueChange={setViewProject}>
                 <SelectTrigger className="w-64">
-                  <SelectValue placeholder="Select project" />
+                  <SelectValue placeholder="Seleccionar proyecto" />
                 </SelectTrigger>
                 <SelectContent>
                   {projectList.map((p) => (
@@ -591,17 +637,14 @@ export default function DatasetsPage() {
             </div>
           )}
 
-          {/* Dataset list */}
           {!viewProject ? (
-            <Card className="border-dashed">
-              <CardContent className="flex flex-col items-center justify-center py-12">
-                <Database className="h-12 w-12 text-muted-foreground/50 mb-4" />
-                <h3 className="text-lg font-medium">Select a project</h3>
-                <p className="text-sm text-muted-foreground mt-1">
-                  Create a project first, then upload your datasets
-                </p>
-              </CardContent>
-            </Card>
+            <div className="flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-muted-foreground/20 bg-muted/30 px-8 py-16 text-center">
+              <Database className="h-12 w-12 text-muted-foreground/30 mb-4" />
+              <h3 className="text-lg font-semibold">Selecciona un proyecto</h3>
+              <p className="text-sm text-muted-foreground mt-2 max-w-sm">
+                Crea un proyecto primero para poder organizar tus datos de marketing
+              </p>
+            </div>
           ) : isLoading ? (
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {[...Array(3)].map((_, i) => (
@@ -609,71 +652,80 @@ export default function DatasetsPage() {
               ))}
             </div>
           ) : !datasetList?.length ? (
-            <Card className="border-dashed">
-              <CardContent className="flex flex-col items-center justify-center py-12">
-                <FileSpreadsheet className="h-12 w-12 text-muted-foreground/50 mb-4" />
-                <h3 className="text-lg font-medium">No uploaded datasets</h3>
-                <p className="text-sm text-muted-foreground mt-1 mb-4">
-                  Upload a CSV or use the pre-loaded data to get started
-                </p>
-                <Button onClick={() => setOpen(true)}>
-                  <Upload className="mr-2 h-4 w-4" />
-                  Upload Dataset
-                </Button>
-              </CardContent>
-            </Card>
+            <div className="flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-muted-foreground/20 bg-muted/30 px-8 py-16 text-center">
+              <FileSpreadsheet className="h-12 w-12 text-muted-foreground/30 mb-4" />
+              <h3 className="text-lg font-semibold">Sin datos subidos</h3>
+              <p className="text-sm text-muted-foreground mt-2 max-w-sm mb-4">
+                Sube un CSV con tus datos de marketing o usa los datos de ejemplo para empezar
+              </p>
+              <Button onClick={() => setOpen(true)} className="gap-2">
+                <Upload className="h-4 w-4" />
+                Subir datos
+              </Button>
+            </div>
           ) : (
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {datasetList.map((ds) => (
                 <Link key={ds.id} href={`/datasets/${ds.id}?project=${viewProject}`}>
-                  <Card className="hover:border-primary/50 transition-colors h-full cursor-pointer">
-                    <CardHeader className="pb-3">
-                      <div className="flex items-center justify-between">
-                        <CardTitle className="text-base flex items-center gap-2">
-                          <FileSpreadsheet className="h-4 w-4 text-primary" />
-                          {ds.name}
-                        </CardTitle>
-                        <Badge
-                          variant={ds.status === "validated" ? "outline" : "destructive"}
-                          className="text-xs"
-                        >
-                          {ds.status}
-                        </Badge>
-                      </div>
-                    </CardHeader>
-                    <CardContent className="space-y-2">
-                      <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                        <span className="flex items-center gap-1">
-                          <Hash className="h-3 w-3" />
-                          {ds.row_count?.toLocaleString()} rows
-                        </span>
-                        <span className="flex items-center gap-1">
-                          <Columns3 className="h-3 w-3" />
-                          {ds.column_names?.length} cols
-                        </span>
-                      </div>
-                      {ds.spend_columns && ds.spend_columns.length > 0 && (
-                        <div className="flex flex-wrap gap-1">
-                          {ds.spend_columns.slice(0, 4).map((col: string) => (
-                            <Badge key={col} variant="secondary" className="text-xs">
-                              {col.replace("spend_", "")}
-                            </Badge>
-                          ))}
-                          {ds.spend_columns.length > 4 && (
-                            <Badge variant="secondary" className="text-xs">
-                              +{ds.spend_columns.length - 4}
-                            </Badge>
-                          )}
+                  <div className="rounded-xl border bg-card p-5 space-y-3 hover:border-primary/40 hover:shadow-sm transition-all cursor-pointer h-full">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                          <FileSpreadsheet className="h-4 w-4" />
                         </div>
-                      )}
-                      {ds.date_range && (
-                        <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                          <Calendar className="h-3 w-3" />
-                          {ds.date_range.min} — {ds.date_range.max}
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
+                        <h3 className="text-sm font-semibold truncate">{ds.name}</h3>
+                      </div>
+                      <Badge
+                        variant={ds.status === "validated" ? "outline" : "destructive"}
+                        className={`text-[10px] shrink-0 ${
+                          ds.status === "validated"
+                            ? "border-emerald-200 text-emerald-700"
+                            : ""
+                        }`}
+                      >
+                        {ds.status === "validated" && <CheckCircle2 className="h-3 w-3 mr-1" />}
+                        {ds.status === "validated" ? "Validado" : ds.status}
+                      </Badge>
+                    </div>
+
+                    <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                      <span className="flex items-center gap-1">
+                        <Hash className="h-3 w-3" />
+                        {ds.row_count?.toLocaleString("es-ES")} semanas
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <Columns3 className="h-3 w-3" />
+                        {ds.column_names?.length} columnas
+                      </span>
+                    </div>
+
+                    {ds.spend_columns && ds.spend_columns.length > 0 && (
+                      <div className="flex flex-wrap gap-1.5">
+                        {ds.spend_columns.slice(0, 4).map((col: string) => (
+                          <span
+                            key={col}
+                            className="inline-flex items-center rounded-md bg-primary/8 px-2 py-0.5 text-[11px] font-medium text-primary"
+                          >
+                            {col.replace("spend_", "")}
+                          </span>
+                        ))}
+                        {ds.spend_columns.length > 4 && (
+                          <span className="inline-flex items-center rounded-md bg-muted px-2 py-0.5 text-[11px] text-muted-foreground">
+                            +{ds.spend_columns.length - 4}
+                          </span>
+                        )}
+                      </div>
+                    )}
+
+                    {ds.date_range && (
+                      <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                        <Calendar className="h-3 w-3" />
+                        {new Date(ds.date_range.min).toLocaleDateString("es-ES", { month: "short", year: "numeric" })}
+                        {" — "}
+                        {new Date(ds.date_range.max).toLocaleDateString("es-ES", { month: "short", year: "numeric" })}
+                      </div>
+                    )}
+                  </div>
                 </Link>
               ))}
             </div>

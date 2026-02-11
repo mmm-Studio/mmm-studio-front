@@ -29,6 +29,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
+import { SectionHeader, MetricCard, InfoTooltip } from "@/components/marketing";
 import {
   TrendingUp,
   Loader2,
@@ -38,11 +39,13 @@ import {
   ArrowDownRight,
   BarChart3,
   Target,
-  Info,
   Award,
   AlertTriangle,
-  Zap,
+  Sparkles,
+  Lightbulb,
   PieChartIcon,
+  Calendar,
+  Zap,
 } from "lucide-react";
 import {
   BarChart,
@@ -93,16 +96,17 @@ function KpiCard({ title, value, subtitle, icon: Icon, color = "" }: {
   );
 }
 
-function InsightBanner({ type, children }: { type: "info" | "success" | "warning"; children: React.ReactNode }) {
+function InsightBanner({ type, children }: { type: "info" | "success" | "warning" | "opportunity"; children: React.ReactNode }) {
   const styles = {
-    info: "bg-blue-50 border-blue-200 text-blue-800 dark:bg-blue-950 dark:border-blue-800 dark:text-blue-200",
-    success: "bg-green-50 border-green-200 text-green-800 dark:bg-green-950 dark:border-green-800 dark:text-green-200",
-    warning: "bg-amber-50 border-amber-200 text-amber-800 dark:bg-amber-950 dark:border-amber-800 dark:text-amber-200",
+    info: "bg-blue-50 border-blue-200 text-blue-800 dark:bg-blue-950/30 dark:border-blue-800 dark:text-blue-200",
+    success: "bg-emerald-50 border-emerald-200 text-emerald-800 dark:bg-emerald-950/30 dark:border-emerald-800 dark:text-emerald-200",
+    warning: "bg-amber-50 border-amber-200 text-amber-800 dark:bg-amber-950/30 dark:border-amber-800 dark:text-amber-200",
+    opportunity: "bg-primary/5 border-primary/20 text-foreground",
   };
-  const icons = { info: Info, success: Award, warning: AlertTriangle };
+  const icons = { info: Lightbulb, success: Award, warning: AlertTriangle, opportunity: Sparkles };
   const Icon = icons[type];
   return (
-    <div className={`flex items-start gap-3 p-4 rounded-lg border ${styles[type]}`}>
+    <div className={`flex items-start gap-3 p-4 rounded-xl border ${styles[type]}`}>
       <Icon className="h-4 w-4 mt-0.5 shrink-0" />
       <div className="text-sm leading-relaxed">{children}</div>
     </div>
@@ -232,7 +236,7 @@ export default function OptimizationPage() {
     },
     onSuccess: (data) => {
       setHistoricalResult(data as unknown as Record<string, unknown>);
-      toast.success("Historical optimization complete");
+      toast.success("Optimizacion historica completada");
     },
     onError: (err: Error) => toast.error(err.message),
   });
@@ -248,7 +252,7 @@ export default function OptimizationPage() {
     },
     onSuccess: (data) => {
       setBudgetResult(data as unknown as Record<string, unknown>);
-      toast.success("Budget optimization complete");
+      toast.success("Optimizacion de presupuesto completada");
     },
     onError: (err: Error) => toast.error(err.message),
   });
@@ -265,7 +269,7 @@ export default function OptimizationPage() {
     },
     onSuccess: (data) => {
       setCompareResult(data as unknown as Record<string, unknown>);
-      toast.success("Period comparison complete");
+      toast.success("Comparacion de periodos completada");
     },
     onError: (err: Error) => toast.error(err.message),
   });
@@ -273,7 +277,7 @@ export default function OptimizationPage() {
   const saveMut = useMutation({
     mutationFn: (params: { name: string; type: "historical" | "budget" | "comparison"; input_params: Record<string, unknown>; results: Record<string, unknown> }) =>
       scenarios.save(currentOrgId!, selectedModel, params),
-    onSuccess: () => toast.success("Scenario saved"),
+    onSuccess: () => toast.success("Escenario guardado"),
     onError: (err: Error) => toast.error(err.message),
   });
 
@@ -307,36 +311,36 @@ export default function OptimizationPage() {
         {/* KPI cards - Enhanced */}
         <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
           <KpiCard
-            title="Revenue Uplift"
+            title="Mejora de ventas"
             value={<span className="flex items-center gap-1">{uplift > 0 ? <ArrowUpRight className="h-5 w-5" /> : <ArrowDownRight className="h-5 w-5" />}{Number(uplift).toFixed(1)}%</span>}
             icon={Zap}
             color={uplift > 0 ? "text-green-600" : "text-red-600"}
-            subtitle="Same budget, smarter allocation"
+            subtitle="Mismo presupuesto, mejor distribucion"
           />
           <KpiCard
-            title="Original Response"
+            title="Ventas originales"
             value={fmt(origResp || 0)}
             icon={Target}
-            subtitle="Actual revenue achieved"
+            subtitle="Ventas reales del periodo"
           />
           <KpiCard
-            title="Optimized Response"
+            title="Ventas optimizadas"
             value={fmt(optResp || 0)}
             icon={TrendingUp}
             color="text-green-600"
-            subtitle={`+${fmt((optResp || 0) - (origResp || 0))} additional revenue`}
+            subtitle={`+${fmt((optResp || 0) - (origResp || 0))} ventas adicionales`}
           />
           <KpiCard
-            title="Total Budget"
+            title="Presupuesto total"
             value={fmt(totalOriginal)}
             icon={DollarSign}
-            subtitle="Budget held constant"
+            subtitle="Presupuesto sin cambios"
           />
           <KpiCard
-            title="Channels Moved"
+            title="Canales movidos"
             value={`${increaseChannels.length}↑ ${decreaseChannels.length}↓`}
             icon={BarChart3}
-            subtitle={`${maintainChannels.length} unchanged`}
+            subtitle={`${maintainChannels.length} sin cambios`}
           />
         </div>
 
@@ -344,13 +348,13 @@ export default function OptimizationPage() {
         <div className="grid gap-3 sm:grid-cols-2">
           {increaseChannels.length > 0 && (
             <InsightBanner type="success">
-              <strong>Increase budget for:</strong>{" "}
+              <strong>Aumentar inversion en:</strong>{" "}
               {increaseChannels.map(c => `${c.channel} (+${c.change.toFixed(0)}%)`).join(", ")}
             </InsightBanner>
           )}
           {decreaseChannels.length > 0 && (
             <InsightBanner type="warning">
-              <strong>Reduce budget for:</strong>{" "}
+              <strong>Reducir inversion en:</strong>{" "}
               {decreaseChannels.map(c => `${c.channel} (${c.change.toFixed(0)}%)`).join(", ")}
             </InsightBanner>
           )}
@@ -371,7 +375,7 @@ export default function OptimizationPage() {
             }
           >
             <Save className="mr-2 h-4 w-4" />
-            Save Scenario
+            Guardar escenario
           </Button>
         </div>
 
@@ -384,7 +388,7 @@ export default function OptimizationPage() {
             <Tooltip formatter={(value) => [fmt(Number(value)), ""]} contentStyle={{ borderRadius: "8px", border: "1px solid #e2e8f0" }} />
             <Legend />
             <Bar dataKey="original" fill="#94a3b8" name="Original" radius={[4, 4, 0, 0]} />
-            <Bar dataKey="optimized" fill="#6366f1" name="Optimized" radius={[4, 4, 0, 0]} />
+            <Bar dataKey="optimized" fill="#6366f1" name="Optimizado" radius={[4, 4, 0, 0]} />
           </BarChart>
         </ResponsiveContainer>
 
@@ -392,8 +396,8 @@ export default function OptimizationPage() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm">Original Allocation</CardTitle>
-              <CardDescription className="text-xs">How budget was actually distributed</CardDescription>
+              <CardTitle className="text-sm">Distribucion original</CardTitle>
+              <CardDescription className="text-xs">Como se distribuyó realmente el presupuesto</CardDescription>
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={280}>
@@ -408,8 +412,8 @@ export default function OptimizationPage() {
           </Card>
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm">Optimized Allocation</CardTitle>
-              <CardDescription className="text-xs">How the optimizer recommends distributing budget</CardDescription>
+              <CardTitle className="text-sm">Distribucion optimizada</CardTitle>
+              <CardDescription className="text-xs">Como recomienda el optimizador distribuir el presupuesto</CardDescription>
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={280}>
@@ -427,8 +431,8 @@ export default function OptimizationPage() {
         {/* Change magnitude bars */}
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm">Budget Reallocation Magnitude</CardTitle>
-            <CardDescription className="text-xs">How much each channel changes from original allocation</CardDescription>
+            <CardTitle className="text-sm">Magnitud del cambio</CardTitle>
+            <CardDescription className="text-xs">Cuanto cambia cada canal respecto a la distribucion original</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-2">
@@ -457,12 +461,12 @@ export default function OptimizationPage() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Channel</TableHead>
+                <TableHead>Canal</TableHead>
                 <TableHead className="text-right">Original</TableHead>
-                <TableHead className="text-right">Optimized</TableHead>
-                <TableHead className="text-right">Difference</TableHead>
-                <TableHead className="text-right">Change</TableHead>
-                <TableHead className="text-right">Action</TableHead>
+                <TableHead className="text-right">Optimizado</TableHead>
+                <TableHead className="text-right">Diferencia</TableHead>
+                <TableHead className="text-right">Cambio</TableHead>
+                <TableHead className="text-right">Accion</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -476,7 +480,7 @@ export default function OptimizationPage() {
                   <TableCell className="text-right">
                     <Badge variant={row.change > 2 ? "outline" : row.change < -2 ? "secondary" : "default"}
                       className={row.change > 2 ? "border-green-300 text-green-700" : row.change < -2 ? "text-red-600" : ""}>
-                      {row.change > 2 ? "Increase" : row.change < -2 ? "Decrease" : "Maintain"}
+                      {row.change > 2 ? "Aumentar" : row.change < -2 ? "Reducir" : "Mantener"}
                     </Badge>
                   </TableCell>
                 </TableRow>
@@ -533,36 +537,36 @@ export default function OptimizationPage() {
         {/* KPI cards - Enhanced */}
         <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
           <KpiCard
-            title="Expected Response"
+            title="Ventas esperadas"
             value={fmt(respMean || 0)}
             icon={Target}
             color="text-green-600"
-            subtitle={respCi5 != null && respCi95 != null ? `CI: ${fmt(respCi5)} — ${fmt(respCi95)}` : `Over ${bNumWeeks} weeks`}
+            subtitle={respCi5 != null && respCi95 != null ? `IC: ${fmt(respCi5)} — ${fmt(respCi95)}` : `En ${bNumWeeks} semanas`}
           />
           <KpiCard
-            title="Expected ROAS"
+            title="Retorno esperado"
             value={`${Number(expectedRoas || 0).toFixed(2)}x`}
             icon={TrendingUp}
             color={expectedRoas >= 1 ? "text-green-600" : "text-amber-600"}
-            subtitle={expectedRoas >= 1 ? "Profitable allocation" : "Below breakeven"}
+            subtitle={expectedRoas >= 1 ? "Distribucion rentable" : "Por debajo del umbral"}
           />
           <KpiCard
-            title="Weekly Budget"
+            title="Presupuesto semanal"
             value={fmt(totalOptimal)}
             icon={DollarSign}
-            subtitle={`${fmt(bTotalBudget)} total / ${bNumWeeks} weeks`}
+            subtitle={`${fmt(bTotalBudget)} total / ${bNumWeeks} semanas`}
           />
           <KpiCard
-            title="Top Channel"
+            title="Canal principal"
             value={`${topChannelPct.toFixed(0)}%`}
             icon={Award}
             subtitle={topChannel.channel}
           />
           <KpiCard
-            title="Channels"
+            title="Canales"
             value={`${channels.length}`}
             icon={PieChartIcon}
-            subtitle={`${increaseChannels.length} up, ${decreaseChannels.length} down`}
+            subtitle={`${increaseChannels.length} suben, ${decreaseChannels.length} bajan`}
           />
         </div>
 
@@ -570,22 +574,22 @@ export default function OptimizationPage() {
         <div className="grid gap-3 sm:grid-cols-2">
           {expectedRoas >= 1 && (
             <InsightBanner type="success">
-              <strong>Profitable allocation!</strong> Expected ROAS of {Number(expectedRoas).toFixed(2)}x means every dollar invested returns ${Number(expectedRoas).toFixed(2)}.
+              <strong>Distribucion rentable!</strong> Un retorno esperado de {Number(expectedRoas).toFixed(2)}x significa que por cada euro invertido recuperas {Number(expectedRoas).toFixed(2)} EUR.
             </InsightBanner>
           )}
           {topChannelPct > 40 && (
             <InsightBanner type="info">
-              <strong>{topChannel.channel}</strong> receives {topChannelPct.toFixed(0)}% of the budget — high concentration. The model sees this as the highest-return channel.
+              <strong>{topChannel.channel}</strong> recibe el {topChannelPct.toFixed(0)}% del presupuesto — alta concentracion. El modelo lo identifica como el canal con mayor retorno.
             </InsightBanner>
           )}
           {increaseChannels.length > 0 && (
             <InsightBanner type="success">
-              <strong>Scale up:</strong> {increaseChannels.map(c => c.channel).join(", ")} — optimizer allocates more budget to these high-return channels.
+              <strong>Aumentar:</strong> {increaseChannels.map(c => c.channel).join(", ")} — el optimizador asigna mas presupuesto a estos canales de alto retorno.
             </InsightBanner>
           )}
           {decreaseChannels.length > 0 && (
             <InsightBanner type="warning">
-              <strong>Scale down:</strong> {decreaseChannels.map(c => c.channel).join(", ")} — lower marginal returns suggest reducing investment.
+              <strong>Reducir:</strong> {decreaseChannels.map(c => c.channel).join(", ")} — el retorno marginal sugiere reducir la inversion.
             </InsightBanner>
           )}
         </div>
@@ -605,7 +609,7 @@ export default function OptimizationPage() {
             }
           >
             <Save className="mr-2 h-4 w-4" />
-            Save Scenario
+            Guardar escenario
           </Button>
         </div>
 
@@ -613,7 +617,7 @@ export default function OptimizationPage() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
           <Card className="lg:col-span-2">
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm">Baseline vs Optimal Weekly Spend</CardTitle>
+              <CardTitle className="text-sm">Gasto semanal: actual vs optimo</CardTitle>
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={350}>
@@ -623,8 +627,8 @@ export default function OptimizationPage() {
                   <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => fmt(v)} />
                   <Tooltip formatter={(value) => [fmt(Number(value)), ""]} contentStyle={{ borderRadius: "8px", border: "1px solid #e2e8f0" }} />
                   <Legend />
-                  <Bar dataKey="baseline" fill="#94a3b8" name="Baseline/week" radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="optimal" fill="#6366f1" name="Optimal/week" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="baseline" fill="#94a3b8" name="Actual/semana" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="optimal" fill="#6366f1" name="Optimo/semana" radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </CardContent>
@@ -632,8 +636,8 @@ export default function OptimizationPage() {
 
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm">Optimal Allocation Mix</CardTitle>
-              <CardDescription className="text-xs">Weekly budget distribution</CardDescription>
+              <CardTitle className="text-sm">Mix de distribucion optima</CardTitle>
+              <CardDescription className="text-xs">Distribucion semanal del presupuesto</CardDescription>
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={280}>
@@ -641,7 +645,7 @@ export default function OptimizationPage() {
                   <Pie data={allocPie} cx="50%" cy="50%" outerRadius={95} innerRadius={35} dataKey="value" label={({ name, percent }) => `${name}: ${((percent ?? 0) * 100).toFixed(0)}%`} labelLine>
                     {allocPie.map((entry, i) => <Cell key={i} fill={entry.fill} />)}
                   </Pie>
-                  <Tooltip formatter={(value) => [fmt(Number(value)), "per week"]} />
+                  <Tooltip formatter={(value) => [fmt(Number(value)), "por semana"]} />
                 </PieChart>
               </ResponsiveContainer>
               <div className="space-y-1 mt-2">
@@ -651,7 +655,7 @@ export default function OptimizationPage() {
                       <div className="h-2 w-2 rounded-full" style={{ backgroundColor: item.fill }} />
                       <span>{item.name}</span>
                     </div>
-                    <span className="font-medium">{fmt(item.value)}/wk</span>
+                    <span className="font-medium">{fmt(item.value)}/sem</span>
                   </div>
                 ))}
               </div>
@@ -662,7 +666,7 @@ export default function OptimizationPage() {
         {/* Change magnitude */}
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm">Budget Shift from Baseline</CardTitle>
+            <CardTitle className="text-sm">Cambio respecto al gasto actual</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-2">
@@ -691,12 +695,12 @@ export default function OptimizationPage() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Channel</TableHead>
-                <TableHead className="text-right">Baseline/wk</TableHead>
-                <TableHead className="text-right">Optimal/wk</TableHead>
-                <TableHead className="text-right">Total ({bNumWeeks}wk)</TableHead>
-                <TableHead className="text-right">Change</TableHead>
-                <TableHead className="text-right">Action</TableHead>
+                <TableHead>Canal</TableHead>
+                <TableHead className="text-right">Actual/sem</TableHead>
+                <TableHead className="text-right">Optimo/sem</TableHead>
+                <TableHead className="text-right">Total ({bNumWeeks}sem)</TableHead>
+                <TableHead className="text-right">Cambio</TableHead>
+                <TableHead className="text-right">Accion</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -710,7 +714,7 @@ export default function OptimizationPage() {
                   <TableCell className="text-right">
                     <Badge variant={row.change > 5 ? "outline" : row.change < -5 ? "secondary" : "default"}
                       className={row.change > 5 ? "border-green-300 text-green-700" : row.change < -5 ? "text-red-600" : ""}>
-                      {row.change > 5 ? "Scale Up" : row.change < -5 ? "Scale Down" : "Maintain"}
+                      {row.change > 5 ? "Aumentar" : row.change < -5 ? "Reducir" : "Mantener"}
                     </Badge>
                   </TableCell>
                 </TableRow>
@@ -731,21 +735,20 @@ export default function OptimizationPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Optimization</h1>
-        <p className="text-muted-foreground mt-1">
-          Optimize your marketing budget allocation using trained models
-        </p>
-      </div>
+    <div className="space-y-8">
+      <SectionHeader
+        icon={TrendingUp}
+        title="Planificar Presupuesto"
+        description="Optimiza la distribucion de tu presupuesto de marketing usando los modelos entrenados. Descubre como redistribuir tu inversion para maximizar resultados."
+      />
 
       {/* Model selector */}
       <div className="flex items-center gap-4">
         <div className="space-y-1">
-          <Label className="text-xs text-muted-foreground">Project</Label>
+          <Label className="text-xs text-muted-foreground">Proyecto</Label>
           <Select value={selectedProject} onValueChange={(v) => { setSelectedProject(v); setSelectedModel(""); }}>
             <SelectTrigger className="w-48">
-              <SelectValue placeholder="Select project" />
+              <SelectValue placeholder="Seleccionar proyecto" />
             </SelectTrigger>
             <SelectContent>
               {projectList?.map((p) => (
@@ -755,10 +758,10 @@ export default function OptimizationPage() {
           </Select>
         </div>
         <div className="space-y-1">
-          <Label className="text-xs text-muted-foreground">Model</Label>
+          <Label className="text-xs text-muted-foreground">Analisis</Label>
           <Select value={selectedModel} onValueChange={handleModelChange} disabled={!readyModels.length}>
             <SelectTrigger className="w-64">
-              <SelectValue placeholder={readyModels.length ? "Select model" : "No ready models"} />
+              <SelectValue placeholder={readyModels.length ? "Seleccionar analisis" : "Sin analisis listos"} />
             </SelectTrigger>
             <SelectContent>
               {readyModels.map((m) => (
@@ -772,19 +775,19 @@ export default function OptimizationPage() {
       {!selectedModel ? (
         <Card className="border-dashed">
           <CardContent className="flex flex-col items-center justify-center py-12">
-            <TrendingUp className="h-12 w-12 text-muted-foreground/50 mb-4" />
-            <h3 className="text-lg font-medium">Select a model</h3>
-            <p className="text-sm text-muted-foreground mt-1">
-              Choose a trained model to run optimizations
+            <TrendingUp className="h-12 w-12 text-muted-foreground/30 mb-4" />
+            <h3 className="text-lg font-semibold">Selecciona un analisis</h3>
+            <p className="text-sm text-muted-foreground mt-2">
+              Elige un modelo entrenado para optimizar tu presupuesto
             </p>
           </CardContent>
         </Card>
       ) : (
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList>
-            <TabsTrigger value="historical">Historical Optimization</TabsTrigger>
-            <TabsTrigger value="budget">Budget Calculator</TabsTrigger>
-            <TabsTrigger value="compare">Period Comparison</TabsTrigger>
+            <TabsTrigger value="historical">Optimizar periodo pasado</TabsTrigger>
+            <TabsTrigger value="budget">Planificar presupuesto</TabsTrigger>
+            <TabsTrigger value="compare">Comparar periodos</TabsTrigger>
           </TabsList>
 
           {/* Historical */}
@@ -793,30 +796,30 @@ export default function OptimizationPage() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <TrendingUp className="h-5 w-5" />
-                  Historical Budget Optimization
+                  Optimizacion de periodo historico
                 </CardTitle>
                 <CardDescription>
-                  Optimize how you should have allocated spend in a past period
+                  Descubre como debiste haber distribuido tu inversion en un periodo pasado para maximizar resultados
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="grid grid-cols-3 gap-4">
                   <div className="space-y-2">
-                    <Label>Start Date</Label>
+                    <Label>Fecha inicio</Label>
                     <Input type="date" value={hStartDate} onChange={(e) => setHStartDate(e.target.value)} min={modelStartDate} max={modelEndDate} />
                   </div>
                   <div className="space-y-2">
-                    <Label>End Date</Label>
+                    <Label>Fecha fin</Label>
                     <Input type="date" value={hEndDate} onChange={(e) => setHEndDate(e.target.value)} min={modelStartDate} max={modelEndDate} />
                   </div>
                   <div className="space-y-2">
-                    <Label>Budget Bounds (%)</Label>
+                    <Label>Limite de variacion (%)</Label>
                     <Input type="number" step="0.05" min="0" max="1" value={hBounds} onChange={(e) => setHBounds(Number(e.target.value))} />
                   </div>
                 </div>
                 {modelStartDate && (
                   <p className="text-xs text-muted-foreground">
-                    Training data range: {modelStartDate} to {modelEndDate}
+                    Rango de datos del modelo: {modelStartDate} a {modelEndDate}
                   </p>
                 )}
                 <Button
@@ -824,7 +827,7 @@ export default function OptimizationPage() {
                   disabled={historicalMut.isPending || !hStartDate || !hEndDate}
                 >
                   {historicalMut.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  Run Optimization
+                  Optimizar
                 </Button>
                 {renderHistoricalResults()}
               </CardContent>
@@ -837,24 +840,24 @@ export default function OptimizationPage() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <DollarSign className="h-5 w-5" />
-                  Budget Calculator
+                  Calculadora de presupuesto
                 </CardTitle>
                 <CardDescription>
-                  Allocate a future budget optimally across channels
+                  Distribuye un presupuesto futuro de forma optima entre tus canales
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="grid grid-cols-3 gap-4">
                   <div className="space-y-2">
-                    <Label>Total Budget</Label>
+                    <Label>Presupuesto total (EUR)</Label>
                     <Input type="number" min="1000" step="1000" value={bTotalBudget} onChange={(e) => setBTotalBudget(Number(e.target.value))} />
                   </div>
                   <div className="space-y-2">
-                    <Label>Number of Weeks</Label>
+                    <Label>Numero de semanas</Label>
                     <Input type="number" min="1" max="52" value={bNumWeeks} onChange={(e) => setBNumWeeks(Number(e.target.value))} />
                   </div>
                   <div className="space-y-2">
-                    <Label>Default Limit (%)</Label>
+                    <Label>Limite por canal (%)</Label>
                     <Input type="number" step="0.05" min="0" max="1" value={bDefaultLimit} onChange={(e) => setBDefaultLimit(Number(e.target.value))} />
                   </div>
                 </div>
@@ -863,7 +866,7 @@ export default function OptimizationPage() {
                   disabled={budgetMut.isPending}
                 >
                   {budgetMut.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  Calculate Optimal Allocation
+                  Calcular distribucion optima
                 </Button>
                 {renderBudgetResults()}
               </CardContent>
@@ -874,35 +877,35 @@ export default function OptimizationPage() {
           <TabsContent value="compare" className="mt-4">
             <Card>
               <CardHeader>
-                <CardTitle>Period Comparison</CardTitle>
+                <CardTitle>Comparar periodos</CardTitle>
                 <CardDescription>
-                  Compare marketing performance between two time periods
+                  Compara el rendimiento de tu marketing entre dos periodos de tiempo
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="grid grid-cols-2 gap-6">
                   <div className="space-y-3">
-                    <h4 className="text-sm font-medium">Period 1</h4>
+                    <h4 className="text-sm font-medium">Periodo 1</h4>
                     <div className="grid grid-cols-2 gap-2">
                       <div className="space-y-1">
-                        <Label className="text-xs">Start</Label>
+                        <Label className="text-xs">Inicio</Label>
                         <Input type="date" value={cP1Start} onChange={(e) => setCP1Start(e.target.value)} />
                       </div>
                       <div className="space-y-1">
-                        <Label className="text-xs">End</Label>
+                        <Label className="text-xs">Fin</Label>
                         <Input type="date" value={cP1End} onChange={(e) => setCP1End(e.target.value)} />
                       </div>
                     </div>
                   </div>
                   <div className="space-y-3">
-                    <h4 className="text-sm font-medium">Period 2</h4>
+                    <h4 className="text-sm font-medium">Periodo 2</h4>
                     <div className="grid grid-cols-2 gap-2">
                       <div className="space-y-1">
-                        <Label className="text-xs">Start</Label>
+                        <Label className="text-xs">Inicio</Label>
                         <Input type="date" value={cP2Start} onChange={(e) => setCP2Start(e.target.value)} />
                       </div>
                       <div className="space-y-1">
-                        <Label className="text-xs">End</Label>
+                        <Label className="text-xs">Fin</Label>
                         <Input type="date" value={cP2End} onChange={(e) => setCP2End(e.target.value)} />
                       </div>
                     </div>
@@ -913,7 +916,7 @@ export default function OptimizationPage() {
                   disabled={compareMut.isPending || !cP1Start || !cP1End || !cP2Start || !cP2End}
                 >
                   {compareMut.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  Compare Periods
+                  Comparar periodos
                 </Button>
                 {compareResult && (() => {
                   const cr = compareResult as Record<string, unknown>;
@@ -951,23 +954,23 @@ export default function OptimizationPage() {
                     <div className="space-y-6 mt-6">
                       {/* Enhanced KPI cards */}
                       <div className="grid grid-cols-2 lg:grid-cols-6 gap-4">
-                        <KpiCard title="P1 Spend" value={fmt(totalP1)} icon={DollarSign} subtitle={`${cP1Start} — ${cP1End}`} />
-                        <KpiCard title="P2 Spend" value={fmt(totalP2)} icon={DollarSign} subtitle={`${cP2Start} — ${cP2End}`} />
+                        <KpiCard title="Inversion P1" value={fmt(totalP1)} icon={DollarSign} subtitle={`${cP1Start} — ${cP1End}`} />
+                        <KpiCard title="Inversion P2" value={fmt(totalP2)} icon={DollarSign} subtitle={`${cP2Start} — ${cP2End}`} />
                         <KpiCard
-                          title="Spend Change"
+                          title="Cambio inversion"
                           value={<span className="flex items-center gap-1">{spendChange > 0 ? <ArrowUpRight className="h-4 w-4" /> : <ArrowDownRight className="h-4 w-4" />}{Math.abs(spendChange).toFixed(1)}%</span>}
                           icon={BarChart3}
                           color={spendChange > 0 ? "text-amber-600" : "text-green-600"}
                         />
                         <KpiCard
-                          title="Response Change"
+                          title="Cambio ventas"
                           value={<span className="flex items-center gap-1">{respChange > 0 ? <ArrowUpRight className="h-4 w-4" /> : <ArrowDownRight className="h-4 w-4" />}{Math.abs(respChange).toFixed(1)}%</span>}
                           icon={Target}
                           color={respChange > 0 ? "text-green-600" : "text-red-500"}
                         />
-                        <KpiCard title="P1 ROAS" value={`${p1Roas.toFixed(2)}x`} icon={TrendingUp} />
+                        <KpiCard title="Retorno P1" value={`${p1Roas.toFixed(2)}x`} icon={TrendingUp} />
                         <KpiCard
-                          title="P2 ROAS"
+                          title="Retorno P2"
                           value={`${p2Roas.toFixed(2)}x`}
                           icon={TrendingUp}
                           color={p2Roas > p1Roas ? "text-green-600" : "text-red-500"}
@@ -979,22 +982,22 @@ export default function OptimizationPage() {
                       <div className="grid gap-3 sm:grid-cols-2">
                         {respChange > 0 && spendChange <= respChange && (
                           <InsightBanner type="success">
-                            <strong>Efficiency improved!</strong> Response grew {respChange.toFixed(1)}% while spend {spendChange > 0 ? `only grew ${spendChange.toFixed(1)}%` : `decreased ${Math.abs(spendChange).toFixed(1)}%`}.
+                            <strong>Mejora de eficiencia!</strong> Las ventas crecieron {respChange.toFixed(1)}% mientras la inversion {spendChange > 0 ? `solo crecio ${spendChange.toFixed(1)}%` : `bajo ${Math.abs(spendChange).toFixed(1)}%`}.
                           </InsightBanner>
                         )}
                         {respChange < 0 && spendChange > 0 && (
                           <InsightBanner type="warning">
-                            <strong>Efficiency declined.</strong> Spend increased {spendChange.toFixed(1)}% but response dropped {Math.abs(respChange).toFixed(1)}%. Review channel allocation.
+                            <strong>Eficiencia reducida.</strong> La inversion subio {spendChange.toFixed(1)}% pero las ventas bajaron {Math.abs(respChange).toFixed(1)}%. Revisa la distribucion por canal.
                           </InsightBanner>
                         )}
                         {biggestIncrease && (
                           <InsightBanner type="info">
-                            <strong>Biggest increase:</strong> {biggestIncrease.channel} grew {biggestIncrease.pct.toFixed(0)}% ({fmt(biggestIncrease.diff)} more spend).
+                            <strong>Mayor aumento:</strong> {biggestIncrease.channel} crecio {biggestIncrease.pct.toFixed(0)}% ({fmt(biggestIncrease.diff)} mas de inversion).
                           </InsightBanner>
                         )}
                         {biggestDecrease && (
                           <InsightBanner type="info">
-                            <strong>Biggest decrease:</strong> {biggestDecrease.channel} fell {Math.abs(biggestDecrease.pct).toFixed(0)}% ({fmt(Math.abs(biggestDecrease.diff))} less spend).
+                            <strong>Mayor reduccion:</strong> {biggestDecrease.channel} bajo {Math.abs(biggestDecrease.pct).toFixed(0)}% ({fmt(Math.abs(biggestDecrease.diff))} menos de inversion).
                           </InsightBanner>
                         )}
                       </div>
@@ -1034,7 +1037,7 @@ export default function OptimizationPage() {
                       {/* Per-channel change bars */}
                       <Card>
                         <CardHeader className="pb-2">
-                          <CardTitle className="text-sm">Channel Spend Changes: P1 vs P2</CardTitle>
+                          <CardTitle className="text-sm">Cambio de inversion por canal: P1 vs P2</CardTitle>
                         </CardHeader>
                         <CardContent>
                           <div className="space-y-2">
@@ -1062,12 +1065,12 @@ export default function OptimizationPage() {
                         <Table>
                           <TableHeader>
                             <TableRow>
-                              <TableHead>Channel</TableHead>
-                              <TableHead className="text-right">Period 1</TableHead>
-                              <TableHead className="text-right">Period 2</TableHead>
-                              <TableHead className="text-right">Difference</TableHead>
-                              <TableHead className="text-right">Change</TableHead>
-                              <TableHead className="text-right">Direction</TableHead>
+                              <TableHead>Canal</TableHead>
+                              <TableHead className="text-right">Periodo 1</TableHead>
+                              <TableHead className="text-right">Periodo 2</TableHead>
+                              <TableHead className="text-right">Diferencia</TableHead>
+                              <TableHead className="text-right">Cambio</TableHead>
+                              <TableHead className="text-right">Tendencia</TableHead>
                             </TableRow>
                           </TableHeader>
                           <TableBody>
@@ -1081,7 +1084,7 @@ export default function OptimizationPage() {
                                 <TableCell className="text-right">
                                   <Badge variant={row.pct > 5 ? "outline" : row.pct < -5 ? "secondary" : "default"}
                                     className={row.pct > 5 ? "border-indigo-300 text-indigo-700" : row.pct < -5 ? "text-slate-600" : ""}>
-                                    {row.pct > 5 ? "Increased" : row.pct < -5 ? "Decreased" : "Stable"}
+                                    {row.pct > 5 ? "Aumento" : row.pct < -5 ? "Bajo" : "Estable"}
                                   </Badge>
                                 </TableCell>
                               </TableRow>
