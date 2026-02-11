@@ -923,11 +923,11 @@ export default function OptimizationPage() {
                   const p1 = cr.period1 as Record<string, unknown> || {};
                   const p2 = cr.period2 as Record<string, unknown> || {};
                   const comparison = cr.comparison as Record<string, unknown> || {};
-                  // Try structured response first, fall back to flat keys
+                  // Backend returns: spend_by_channel, total_sales, total_contribution, overall_roas
                   const p1Spend = (p1.spend_by_channel || cr.period1_spend) as Record<string, number> || {};
                   const p2Spend = (p2.spend_by_channel || cr.period2_spend) as Record<string, number> || {};
-                  const p1Resp = (p1.total_response || cr.period1_response) as number || 0;
-                  const p2Resp = (p2.total_response || cr.period2_response) as number || 0;
+                  const p1Resp = (p1.total_sales || p1.total_contribution || 0) as number;
+                  const p2Resp = (p2.total_sales || p2.total_contribution || 0) as number;
                   const channels = Object.keys(p1Spend);
                   const compChartData = channels.map((ch) => ({
                     channel: ch.replace("spend_", ""),

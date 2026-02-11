@@ -453,7 +453,7 @@ export interface BudgetOptResult {
   optimal_per_week: Record<string, number>;
   optimal_total: Record<string, number>;
   change_pct: Record<string, number>;
-  expected_response: number;
+  expected_response: { mean: number; ci_5: number; ci_95: number } | number;
   expected_roas: number;
 }
 
