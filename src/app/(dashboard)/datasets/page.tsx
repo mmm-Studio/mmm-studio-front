@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuthStore } from "@/stores/auth-store";
 import { createClient } from "@/lib/supabase/client";
@@ -238,9 +238,11 @@ export default function DatasetsPage() {
   });
 
   // Auto-select first project for viewing
-  if (projectList?.length && !viewProject) {
-    setViewProject(projectList[0].id);
-  }
+  useEffect(() => {
+    if (projectList?.length && !viewProject) {
+      setViewProject(projectList[0].id);
+    }
+  }, [projectList, viewProject]);
 
   return (
     <div className="space-y-6">

@@ -328,10 +328,19 @@ export interface TrainJobInput {
 }
 
 export interface TrainJobResponse {
-  job_id: string;
-  model_id: string;
-  status: string;
-  message: string;
+  job: {
+    id: string;
+    model_id: string;
+    status: string;
+    message: string;
+    [key: string]: unknown;
+  };
+  model: {
+    id: string;
+    name: string;
+    status: string;
+    [key: string]: unknown;
+  };
 }
 
 export interface Job {

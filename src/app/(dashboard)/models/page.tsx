@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useAuthStore } from "@/stores/auth-store";
 import { createClient } from "@/lib/supabase/client";
@@ -70,9 +70,11 @@ export default function ModelsPage() {
     enabled: !!currentOrgId && !!selectedProject,
   });
 
-  if (projectList?.length && !selectedProject) {
-    setSelectedProject(projectList[0].id);
-  }
+  useEffect(() => {
+    if (projectList?.length && !selectedProject) {
+      setSelectedProject(projectList[0].id);
+    }
+  }, [projectList, selectedProject]);
 
   return (
     <div className="space-y-6">

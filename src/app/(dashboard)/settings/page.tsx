@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuthStore } from "@/stores/auth-store";
 import { createClient } from "@/lib/supabase/client";
@@ -119,9 +119,11 @@ export default function SettingsPage() {
   });
 
   // Initialize org name
-  if (orgDetail && !orgName) {
-    setOrgName(orgDetail.name);
-  }
+  useEffect(() => {
+    if (orgDetail && !orgName) {
+      setOrgName(orgDetail.name);
+    }
+  }, [orgDetail, orgName]);
 
   return (
     <div className="space-y-6 max-w-2xl">
