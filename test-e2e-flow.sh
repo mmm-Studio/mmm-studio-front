@@ -162,8 +162,11 @@ section "3. Analysis Data Validation (existing ready model)"
 MODEL_ID=$(curl -s -H "$AUTH_HDR" "$BACKEND/orgs/$ORG_ID/models" | python3 -c "
 import sys,json
 models = json.load(sys.stdin)
-ready = [m for m in models if m.get('status')=='ready']
-print(ready[0]['id'] if ready else '')
+# Pick the oldest ready non-test model (real production model)
+ready = [m for m in models if m.get('status')=='ready' and 'E2E' not in m.get('name','')]
+if not ready:
+    ready = [m for m in models if m.get('status')=='ready']
+print(ready[-1]['id'] if ready else '')
 " 2>/dev/null || echo "")
 
 if [ -z "$MODEL_ID" ]; then
@@ -418,7 +421,8 @@ if errors:
 else:
     print(f'  \033[0;32m✓\033[0m Budget: {len(optimal)} channels allocated')
     print(f'  \033[0;32m✓\033[0m Total allocated: \${total_allocated:,.0f} / \$50,000')
-    print(f'  \033[0;32m✓\033[0m Expected response: {exp_resp:,.0f} (ROAS: {exp_roas:.2f}x)')
+    resp_display = exp_resp_val if isinstance(exp_resp, dict) else exp_resp
+    print(f'  \033[0;32m✓\033[0m Expected response: {resp_display:,.0f} (ROAS: {exp_roas:.2f}x)')
     top = sorted(optimal_total.items(), key=lambda x: -x[1])
     print(f'  \033[0;32m✓\033[0m Top allocation: {top[0][0]}=\${top[0][1]:,.0f}, {top[1][0]}=\${top[1][1]:,.0f}')
 " <<< "$BUDGET"
