@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useSearchParams, useRouter } from "next/navigation";
 import { useAuthStore } from "@/stores/auth-store";
 import { createClient } from "@/lib/supabase/client";
 import { jobs, type TrainJobInput } from "@/lib/api";
@@ -37,13 +38,59 @@ import {
   Loader2,
   Clock,
   XCircle,
-  Cpu,
   PlayCircle,
-  Plus,
   Database,
   Sparkles,
   StopCircle,
+  Zap,
+  Shield,
+  Target,
+  Info,
+  ChevronDown,
 } from "lucide-react";
+
+/* ── Quality presets (hide technical MCMC params from business users) ── */
+const qualityPresets = [
+  {
+    id: "rapido",
+    label: "Rapido",
+    description: "Resultados orientativos en ~5 min. Ideal para explorar datos nuevos.",
+    icon: Zap,
+    color: "text-amber-600",
+    bg: "bg-amber-50 border-amber-200 hover:border-amber-400",
+    bgSelected: "bg-amber-50 border-amber-500 ring-2 ring-amber-200",
+    draws: 300,
+    tune: 300,
+    chains: 2,
+    testWeeks: 4,
+  },
+  {
+    id: "estandar",
+    label: "Estandar",
+    description: "Buen equilibrio entre velocidad y precision. Recomendado para la mayoria de casos.",
+    icon: Target,
+    color: "text-blue-600",
+    bg: "bg-blue-50 border-blue-200 hover:border-blue-400",
+    bgSelected: "bg-blue-50 border-blue-500 ring-2 ring-blue-200",
+    draws: 500,
+    tune: 500,
+    chains: 2,
+    testWeeks: 8,
+  },
+  {
+    id: "preciso",
+    label: "Alta precision",
+    description: "Maxima fiabilidad estadistica. Ideal para decisiones de presupuesto importantes.",
+    icon: Shield,
+    color: "text-emerald-600",
+    bg: "bg-emerald-50 border-emerald-200 hover:border-emerald-400",
+    bgSelected: "bg-emerald-50 border-emerald-500 ring-2 ring-emerald-200",
+    draws: 1000,
+    tune: 1000,
+    chains: 4,
+    testWeeks: 8,
+  },
+] as const;
 
 const statusConfig: Record<string, {
   label: string;
@@ -61,15 +108,30 @@ const statusConfig: Record<string, {
 export default function ModelsPage() {
   const { currentOrgId } = useAuthStore();
   const queryClient = useQueryClient();
+  const searchParams = useSearchParams();
+  const router = useRouter();
+
   const [selectedProject, setSelectedProject] = useState("");
   const [trainOpen, setTrainOpen] = useState(false);
   const [trainProject, setTrainProject] = useState("");
   const [trainDataset, setTrainDataset] = useState("");
   const [modelName, setModelName] = useState("");
+  const [qualityPreset, setQualityPreset] = useState("estandar");
+  const [showAdvanced, setShowAdvanced] = useState(false);
   const [draws, setDraws] = useState(500);
   const [tune, setTune] = useState(500);
   const [chains, setChains] = useState(2);
   const [testWeeks, setTestWeeks] = useState(8);
+  const [justLaunched, setJustLaunched] = useState(false);
+
+  // Auto-open dialog when coming from datasets page with ?launch=true
+  useEffect(() => {
+    if (searchParams.get("launch") === "true") {
+      setTrainOpen(true);
+      // Clean up the URL
+      router.replace("/models", { scroll: false });
+    }
+  }, [searchParams, router]);
 
   const { data: projectList } = useQuery({
     queryKey: ["projects", currentOrgId],
@@ -139,10 +201,39 @@ export default function ModelsPage() {
     enabled: !!currentOrgId,
     refetchInterval: (query) => {
       const data = query.state.data as { status: string }[] | undefined;
-      return data && data.length > 0 ? 5000 : false;
+      const hasActive = data && data.length > 0;
+      // Also refetch models when jobs complete
+      if (!hasActive && justLaunched) {
+        queryClient.invalidateQueries({ queryKey: ["models"] });
+        setJustLaunched(false);
+      }
+      return hasActive ? 5000 : false;
     },
     refetchIntervalInBackground: true,
   });
+
+  // Apply preset values when selection changes
+  useEffect(() => {
+    const preset = qualityPresets.find((p) => p.id === qualityPreset);
+    if (preset && !showAdvanced) {
+      setDraws(preset.draws);
+      setTune(preset.tune);
+      setChains(preset.chains);
+      setTestWeeks(preset.testWeeks);
+    }
+  }, [qualityPreset, showAdvanced]);
+
+  // Auto-generate model name when dataset changes
+  useEffect(() => {
+    if (trainDataset && trainDatasets) {
+      const ds = trainDatasets.find((d) => d.id === trainDataset);
+      if (ds && !modelName) {
+        const now = new Date();
+        const dateStr = now.toLocaleDateString("es-ES", { month: "short", year: "numeric" });
+        setModelName(`${ds.name?.replace("Datos Marketing - ", "") || "Analisis"} — ${dateStr}`);
+      }
+    }
+  }, [trainDataset, trainDatasets, modelName]);
 
   const trainMutation = useMutation({
     mutationFn: () => {
@@ -166,12 +257,13 @@ export default function ModelsPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["models"] });
       queryClient.invalidateQueries({ queryKey: ["active-jobs"] });
-      toast.success("Analisis lanzado. Te avisaremos cuando termine.");
+      toast.success("Analisis lanzado correctamente");
       setTrainOpen(false);
       setModelName("");
       setTrainDataset("");
+      setJustLaunched(true);
     },
-    onError: (err: Error) => toast.error(err.message),
+    onError: (err: Error) => toast.error(`Error al lanzar: ${err.message}`),
   });
 
   const cancelMutation = useMutation({
@@ -199,7 +291,6 @@ export default function ModelsPage() {
 
   const readyModels = modelList?.filter((m) => m.status === "ready") || [];
   const otherModels = modelList?.filter((m) => m.status !== "ready") || [];
-  const hasDatasets = trainDatasets && trainDatasets.length > 0;
   const hasProjects = projectList && projectList.length > 0;
 
   return (
@@ -210,28 +301,35 @@ export default function ModelsPage() {
         description="Tus modelos de Marketing Mix entrenados. Haz clic en cualquiera para ver el rendimiento detallado de cada canal."
       >
         {hasProjects && (
-          <Dialog open={trainOpen} onOpenChange={setTrainOpen}>
+          <Dialog open={trainOpen} onOpenChange={(open) => {
+            setTrainOpen(open);
+            if (!open) { setShowAdvanced(false); }
+          }}>
             <DialogTrigger asChild>
               <Button className="gap-2">
                 <PlayCircle className="h-4 w-4" />
                 Lanzar nuevo analisis
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-lg">
+            <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>Lanzar nuevo analisis</DialogTitle>
                 <DialogDescription>
-                  Selecciona un conjunto de datos y configura los parametros del analisis.
-                  El proceso suele tardar entre 3 y 20 minutos.
+                  Selecciona tus datos y la calidad del analisis. El proceso suele tardar entre 5 y 30 minutos.
                 </DialogDescription>
               </DialogHeader>
               <form
                 onSubmit={(e) => { e.preventDefault(); trainMutation.mutate(); }}
-                className="space-y-4"
+                className="space-y-5"
               >
-                <div className="space-y-2">
-                  <Label>Proyecto</Label>
-                  <Select value={trainProject} onValueChange={(v) => { setTrainProject(v); setTrainDataset(""); }}>
+                {/* Step 1: Project + Dataset */}
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2">
+                    <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-primary-foreground text-xs font-bold">1</span>
+                    <Label className="text-sm font-semibold">Elige tus datos</Label>
+                  </div>
+
+                  <Select value={trainProject} onValueChange={(v) => { setTrainProject(v); setTrainDataset(""); setModelName(""); }}>
                     <SelectTrigger>
                       <SelectValue placeholder="Seleccionar proyecto" />
                     </SelectTrigger>
@@ -241,11 +339,8 @@ export default function ModelsPage() {
                       ))}
                     </SelectContent>
                   </Select>
-                </div>
 
-                <div className="space-y-2">
-                  <Label>Conjunto de datos</Label>
-                  <Select value={trainDataset} onValueChange={setTrainDataset} disabled={!trainProject}>
+                  <Select value={trainDataset} onValueChange={(v) => { setTrainDataset(v); setModelName(""); }} disabled={!trainProject}>
                     <SelectTrigger>
                       <SelectValue placeholder={trainProject ? "Seleccionar datos" : "Elige un proyecto primero"} />
                     </SelectTrigger>
@@ -265,10 +360,13 @@ export default function ModelsPage() {
                   )}
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="model-name">Nombre del analisis</Label>
+                {/* Step 2: Model name */}
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2">
+                    <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-primary-foreground text-xs font-bold">2</span>
+                    <Label className="text-sm font-semibold">Nombre del analisis</Label>
+                  </div>
                   <Input
-                    id="model-name"
                     value={modelName}
                     onChange={(e) => setModelName(e.target.value)}
                     placeholder="Ej: Espana Q1 2024"
@@ -277,33 +375,96 @@ export default function ModelsPage() {
                   />
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="draws" className="text-xs">Muestras (draws)</Label>
-                    <Input id="draws" type="number" value={draws} onChange={(e) => setDraws(Number(e.target.value))} min={100} max={2000} />
+                {/* Step 3: Quality preset */}
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2">
+                    <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-primary-foreground text-xs font-bold">3</span>
+                    <Label className="text-sm font-semibold">Calidad del analisis</Label>
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="tune" className="text-xs">Calentamiento (tune)</Label>
-                    <Input id="tune" type="number" value={tune} onChange={(e) => setTune(Number(e.target.value))} min={100} max={2000} />
+
+                  <div className="grid gap-2">
+                    {qualityPresets.map((preset) => {
+                      const PresetIcon = preset.icon;
+                      const isSelected = qualityPreset === preset.id;
+                      return (
+                        <button
+                          key={preset.id}
+                          type="button"
+                          onClick={() => setQualityPreset(preset.id)}
+                          className={`flex items-start gap-3 rounded-lg border p-3 text-left transition-all ${
+                            isSelected ? preset.bgSelected : preset.bg
+                          }`}
+                        >
+                          <PresetIcon className={`h-5 w-5 mt-0.5 shrink-0 ${preset.color}`} />
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm font-semibold">{preset.label}</span>
+                              {preset.id === "estandar" && (
+                                <Badge variant="secondary" className="text-[10px] px-1.5 py-0">Recomendado</Badge>
+                              )}
+                            </div>
+                            <p className="text-xs text-muted-foreground mt-0.5">{preset.description}</p>
+                          </div>
+                          <div className={`h-4 w-4 shrink-0 rounded-full border-2 mt-0.5 transition-colors ${
+                            isSelected ? "border-primary bg-primary" : "border-muted-foreground/30"
+                          }`}>
+                            {isSelected && (
+                              <CheckCircle2 className="h-3 w-3 text-primary-foreground -mt-0.5 -ml-0.5" />
+                            )}
+                          </div>
+                        </button>
+                      );
+                    })}
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="chains" className="text-xs">Cadenas</Label>
-                    <Input id="chains" type="number" value={chains} onChange={(e) => setChains(Number(e.target.value))} min={1} max={4} />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="test-weeks" className="text-xs">Semanas de test</Label>
-                    <Input id="test-weeks" type="number" value={testWeeks} onChange={(e) => setTestWeeks(Number(e.target.value))} min={0} max={52} />
-                  </div>
+
+                  {/* Advanced toggle */}
+                  <button
+                    type="button"
+                    onClick={() => setShowAdvanced(!showAdvanced)}
+                    className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    <ChevronDown className={`h-3.5 w-3.5 transition-transform ${showAdvanced ? "rotate-180" : ""}`} />
+                    Configuracion avanzada
+                  </button>
+
+                  {showAdvanced && (
+                    <div className="grid grid-cols-2 gap-3 rounded-lg border bg-muted/30 p-3">
+                      <div className="space-y-1.5">
+                        <Label htmlFor="draws" className="text-xs text-muted-foreground">Muestras MCMC</Label>
+                        <Input id="draws" type="number" value={draws} onChange={(e) => setDraws(Number(e.target.value))} min={100} max={2000} className="h-8 text-sm" />
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label htmlFor="tune" className="text-xs text-muted-foreground">Calentamiento</Label>
+                        <Input id="tune" type="number" value={tune} onChange={(e) => setTune(Number(e.target.value))} min={100} max={2000} className="h-8 text-sm" />
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label htmlFor="chains" className="text-xs text-muted-foreground">Cadenas paralelas</Label>
+                        <Input id="chains" type="number" value={chains} onChange={(e) => setChains(Number(e.target.value))} min={1} max={4} className="h-8 text-sm" />
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label htmlFor="test-weeks" className="text-xs text-muted-foreground">Semanas de validacion</Label>
+                        <Input id="test-weeks" type="number" value={testWeeks} onChange={(e) => setTestWeeks(Number(e.target.value))} min={0} max={52} className="h-8 text-sm" />
+                      </div>
+                      <p className="col-span-2 text-[10px] text-muted-foreground flex items-start gap-1">
+                        <Info className="h-3 w-3 shrink-0 mt-0.5" />
+                        Mas muestras y cadenas = mayor precision pero mas tiempo de procesamiento.
+                      </p>
+                    </div>
+                  )}
                 </div>
 
                 <Button
                   type="submit"
                   className="w-full gap-2"
+                  size="lg"
                   disabled={trainMutation.isPending || !trainDataset || !modelName}
                 >
-                  {trainMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
-                  <Sparkles className="h-4 w-4" />
-                  Lanzar analisis
+                  {trainMutation.isPending ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Sparkles className="h-4 w-4" />
+                  )}
+                  {trainMutation.isPending ? "Lanzando..." : "Lanzar analisis"}
                 </Button>
               </form>
             </DialogContent>
@@ -311,42 +472,57 @@ export default function ModelsPage() {
         )}
       </SectionHeader>
 
-      {/* Active jobs banner */}
+      {/* Active jobs banner — shown prominently at top */}
       {activeJobs && activeJobs.length > 0 && (
         <div className="space-y-3">
-          {activeJobs.map((job) => (
-            <div
-              key={job.id}
-              className="flex items-center gap-4 rounded-xl border border-blue-200 bg-blue-50/80 px-5 py-4 dark:bg-blue-950/30 dark:border-blue-800"
-            >
-              <Loader2 className="h-5 w-5 animate-spin text-blue-600 shrink-0" />
-              <div className="flex-1 min-w-0 space-y-2">
-                <div className="flex items-center gap-2">
-                  <p className="text-sm font-medium text-blue-900 dark:text-blue-100">
-                    Analizando: {job.models?.name || job.id.slice(0, 8)}
-                  </p>
-                  <Badge variant="secondary" className="text-[10px]">
-                    {job.status === "running" ? "En curso" : "En cola"}
-                  </Badge>
+          {activeJobs.map((job) => {
+            const progressPct = job.progress || 0;
+            const elapsed = job.started_at
+              ? Math.round((Date.now() - new Date(job.started_at).getTime()) / 60000)
+              : 0;
+            return (
+              <div
+                key={job.id}
+                className="rounded-xl border border-blue-200 bg-gradient-to-r from-blue-50 to-indigo-50/50 px-5 py-4 dark:from-blue-950/30 dark:to-indigo-950/30 dark:border-blue-800"
+              >
+                <div className="flex items-center gap-4">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-100 dark:bg-blue-900">
+                    <Loader2 className="h-5 w-5 animate-spin text-blue-600" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm font-semibold text-blue-900 dark:text-blue-100">
+                        {job.models?.name || "Analisis en curso"}
+                      </p>
+                      <Badge variant="secondary" className="text-[10px]">
+                        {job.status === "running" ? `${progressPct}%` : "En cola"}
+                      </Badge>
+                      {elapsed > 0 && (
+                        <span className="text-[10px] text-blue-600/60">{elapsed} min</span>
+                      )}
+                    </div>
+                    {job.message && (
+                      <p className="text-xs text-blue-700/70 dark:text-blue-300/70 mt-0.5">{job.message}</p>
+                    )}
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-blue-600 hover:text-red-600 shrink-0"
+                    onClick={() => cancelMutation.mutate(job.id)}
+                    disabled={cancelMutation.isPending}
+                  >
+                    <StopCircle className="h-4 w-4" />
+                  </Button>
                 </div>
-                {job.message && (
-                  <p className="text-xs text-blue-700/70 dark:text-blue-300/70">{job.message}</p>
-                )}
                 {job.status === "running" && (
-                  <Progress value={job.progress} className="h-1.5 w-full max-w-xs" />
+                  <div className="mt-3 ml-14">
+                    <Progress value={progressPct} className="h-2 w-full" />
+                  </div>
                 )}
               </div>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="text-blue-600 hover:text-red-600 shrink-0"
-                onClick={() => cancelMutation.mutate(job.id)}
-                disabled={cancelMutation.isPending}
-              >
-                <StopCircle className="h-4 w-4" />
-              </Button>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 

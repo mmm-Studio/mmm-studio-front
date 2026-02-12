@@ -748,7 +748,7 @@ export default function DatasetsPage() {
                   </p>
                 </div>
                 <Button asChild size="sm" className="shrink-0 gap-1.5">
-                  <Link href="/models">
+                  <Link href="/models?launch=true">
                     <Sparkles className="h-3.5 w-3.5" />
                     Lanzar analisis
                   </Link>
