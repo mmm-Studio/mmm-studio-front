@@ -38,6 +38,7 @@ import {
 import { toast } from "sonner";
 import { SectionHeader, InfoTooltip } from "@/components/marketing";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   Database,
   Upload,
@@ -100,6 +101,37 @@ export default function DatasetsPage() {
   const [previewCountry, setPreviewCountry] = useState<string | null>(null);
   const [importCountry, setImportCountry] = useState<string | null>(null);
   const [importProject, setImportProject] = useState<string>("");
+  const [newProjectName, setNewProjectName] = useState("");
+  const [creatingProject, setCreatingProject] = useState(false);
+  const router = useRouter();
+
+  // Quick project creation
+  async function handleCreateProject() {
+    if (!newProjectName.trim() || !currentOrgId) return;
+    setCreatingProject(true);
+    try {
+      const supabase = createClient();
+      const { data, error } = await supabase
+        .from("projects")
+        .insert({ org_id: currentOrgId, name: newProjectName.trim() })
+        .select()
+        .single();
+      if (error) throw new Error(error.message);
+      queryClient.invalidateQueries({ queryKey: ["projects", currentOrgId] });
+      toast.success("Proyecto creado");
+      setNewProjectName("");
+      // Auto-select the new project
+      if (data?.id) {
+        setImportProject(data.id);
+        setSelectedProject(data.id);
+        setViewProject(data.id);
+      }
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Error al crear proyecto");
+    } finally {
+      setCreatingProject(false);
+    }
+  }
 
   const { data: projectList } = useQuery({
     queryKey: ["projects", currentOrgId],
@@ -235,9 +267,10 @@ export default function DatasetsPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["datasets"] });
-      toast.success("Datos importados como conjunto de datos");
+      toast.success("Datos importados correctamente. Ya puedes lanzar un analisis.");
       setImportCountry(null);
       setImportProject("");
+      setActiveTab("uploaded");
     },
     onError: (err: Error) => toast.error(err.message),
   });
@@ -273,18 +306,38 @@ export default function DatasetsPage() {
             <form onSubmit={handleUpload} className="space-y-4">
               <div className="space-y-2">
                 <Label>Proyecto</Label>
-                <Select value={selectedProject} onValueChange={setSelectedProject}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Seleccionar proyecto" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {projectList?.map((p) => (
-                      <SelectItem key={p.id} value={p.id}>
-                        {p.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                {projectList && projectList.length > 0 ? (
+                  <Select value={selectedProject} onValueChange={setSelectedProject}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Seleccionar proyecto" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {projectList.map((p) => (
+                        <SelectItem key={p.id} value={p.id}>
+                          {p.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <div className="flex gap-2">
+                    <Input
+                      placeholder="Ej: Marketing Espana 2024"
+                      value={newProjectName}
+                      onChange={(e) => setNewProjectName(e.target.value)}
+                      className="flex-1"
+                      onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), handleCreateProject())}
+                    />
+                    <Button
+                      type="button"
+                      size="sm"
+                      disabled={!newProjectName.trim() || creatingProject}
+                      onClick={handleCreateProject}
+                    >
+                      {creatingProject ? <Loader2 className="h-4 w-4 animate-spin" /> : "Crear"}
+                    </Button>
+                  </div>
+                )}
               </div>
               <div className="space-y-2">
                 <Label htmlFor="dataset-name">Nombre del conjunto de datos</Label>
@@ -508,11 +561,29 @@ export default function DatasetsPage() {
                           </SelectContent>
                         </Select>
                       ) : (
-                        <div className="flex items-start gap-2 rounded-lg bg-amber-50 border border-amber-200 p-3 dark:bg-amber-950/30 dark:border-amber-800">
-                          <AlertCircle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
-                          <p className="text-xs text-amber-800 dark:text-amber-200">
-                            No tienes proyectos. Crea uno primero desde la seccion de Configuracion.
-                          </p>
+                        <div className="space-y-3">
+                          <div className="flex items-start gap-2 rounded-lg bg-amber-50 border border-amber-200 p-3 dark:bg-amber-950/30 dark:border-amber-800">
+                            <AlertCircle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
+                            <p className="text-xs text-amber-800 dark:text-amber-200">
+                              Necesitas un proyecto para organizar tus datos. Crea uno rapido:
+                            </p>
+                          </div>
+                          <div className="flex gap-2">
+                            <Input
+                              placeholder="Ej: Marketing Espana 2024"
+                              value={newProjectName}
+                              onChange={(e) => setNewProjectName(e.target.value)}
+                              className="flex-1"
+                              onKeyDown={(e) => e.key === "Enter" && handleCreateProject()}
+                            />
+                            <Button
+                              size="sm"
+                              disabled={!newProjectName.trim() || creatingProject}
+                              onClick={handleCreateProject}
+                            >
+                              {creatingProject ? <Loader2 className="h-4 w-4 animate-spin" /> : "Crear"}
+                            </Button>
+                          </div>
                         </div>
                       )}
                     </div>
@@ -664,7 +735,26 @@ export default function DatasetsPage() {
               </Button>
             </div>
           ) : (
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="space-y-4">
+              {/* CTA: guide to training */}
+              <div className="flex items-start gap-4 rounded-xl border border-emerald-200 bg-emerald-50/80 px-5 py-4 dark:bg-emerald-950/30 dark:border-emerald-800">
+                <CheckCircle2 className="h-5 w-5 text-emerald-600 shrink-0 mt-0.5" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-emerald-900 dark:text-emerald-100">
+                    Tus datos estan listos
+                  </p>
+                  <p className="text-xs text-emerald-700/70 dark:text-emerald-300/70 mt-0.5">
+                    Ya puedes lanzar un analisis para descubrir que canales te funcionan mejor.
+                  </p>
+                </div>
+                <Button asChild size="sm" className="shrink-0 gap-1.5">
+                  <Link href="/models">
+                    <Sparkles className="h-3.5 w-3.5" />
+                    Lanzar analisis
+                  </Link>
+                </Button>
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {datasetList.map((ds) => (
                 <Link key={ds.id} href={`/datasets/${ds.id}?project=${viewProject}`}>
                   <div className="rounded-xl border bg-card p-5 space-y-3 hover:border-primary/40 hover:shadow-sm transition-all cursor-pointer h-full">
@@ -728,6 +818,7 @@ export default function DatasetsPage() {
                   </div>
                 </Link>
               ))}
+              </div>
             </div>
           )}
         </TabsContent>
